@@ -3,7 +3,7 @@
 - Decision ID and timestamp:
 - Developer identity and source of explicit statement:
 - Change ID and exact contract revision:
-- Checkpoint: contract approval | provisional approval for testing | final acceptance | revision | cancellation
+- Checkpoint: contract approval | trivial business-review waiver | provisional approval for testing | test-gap approval | final acceptance | revision | cancellation
 - Candidate ID (provisional/final):
 - Delivery and test report IDs (final):
 - Findings presented and disposition of each:

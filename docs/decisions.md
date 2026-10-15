@@ -1,27 +1,30 @@
-# Decisions and open choices
+# Recorded decisions
 
-## Adopted from developer direction
+This is a record of decisions already given and technical representation conventions. It is not a pending approval queue. Material questions must be asked directly in the active developer–Architect conversation before dependent work proceeds.
+
+## Developer direction
 
 - AGAD means Architecture-Governed Agentic Development.
-- The Developer is central and retains business authority, code review and final acceptance.
-- Architect is the interactive coordinator; no independent Orchestrator role.
-- Business Reviewer discovers business scenarios after implementation; it is not an AI code reviewer.
-- Test Engineer follows business review and developer provisional approval.
-- This repository starts with abstraction only; harness implementations are deferred.
+- Developer retains business authority, architectural approval, code review and final acceptance.
+- Architect is the interactive coordinator; no independent Orchestrator or AI code reviewer.
+- Business Reviewer discovers business scenarios after implementation and returns findings through Architect to Developer.
+- Test writing/execution follows business review and provisional developer approval; final acceptance follows tests and human code review.
+- This repository covers abstraction only. Harness implementations are deferred.
 
-## Initial proposals requiring developer review
+## Direct decisions in the follow-up audit, 2026-10-15
 
-These are specification defaults, not claims that the developer already approved them:
+Asked: whether to preserve strict ordering or allow earlier planning and a trivial review waiver.
 
-- Specification version 0.1.0; immutable integer contract revisions within each change.
-- Production candidate and final delivery are distinct references so added tests cannot invalidate identity ambiguously.
-- Two unsuccessful repair cycles trigger a developer retry-budget decision; tune by risk.
-- Existing behavior requires explicit approval to preserve within scope; low-risk preservation can be approved as a bounded group.
-- No open-source license until the repository owner selects one.
-- A Python standard-library checker illustrates governance; the abstract model mandates no language.
+Developer answered: **Allow early planning and a developer-approved review waiver for trivial changes.** Planning does not authorize test writing/execution. Each waiver is an explicit developer decision for the exact candidate, with its trivial-risk rationale; new candidates require fresh review or waiver.
 
-Repository provisioning defaults: name `agad`, private visibility, owned by the authenticated personal account. These are reversible setup choices, not AGAD domain policy.
+Asked: how to handle repeated unsuccessful repairs.
 
-## Deferred
+Developer answered: **Do not set a numeric budget; escalate when progress stalls or uncertainty appears.** The earlier assistant-proposed two-cycle default is removed. No agent may continue a stalled loop by silently broadening scope.
 
-Harness adapter design, authentication storage, execution isolation, actual delegation, provider model mappings, and approval UI. The user's preferred Sol/Luna profiles remain allocation preferences; exact model IDs and supported fallbacks belong to future integrations. Do not add adapter-specific policy to the core.
+## Representation conventions
+
+Specification 0.1.0 is a draft, not a claim of developer final acceptance. Integer immutable contract revisions and distinct production-candidate/delivery references make approval freshness explicit. The JSON reference format is versioned independently. Python is a standard-library reference validator, not a required core implementation language. These are reversible representation choices, not additional business policy.
+
+## Deferred scope
+
+Harness adapters, execution isolation, authentication storage, provider IDs and approval UI remain outside this stage. The private repository has no distribution license selected; licensing is not a dependency of this private abstraction work. Ask the owner directly if publication or distribution is proposed.

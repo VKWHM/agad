@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "change_id": "reservation-cancel",
   "contracts": [
     {
@@ -17,8 +17,7 @@
           "statement": "Preserve sent-reservation rejection",
           "kind": "existing",
           "source": "repo:snapshot-0:cancel",
-          "in_scope": true,
-          "preservation_decision": "D1"
+          "in_scope": true
         },
         {
           "id": "R3",
@@ -27,6 +26,24 @@
           "source": "developer:D1",
           "in_scope": true
         }
+      ],
+      "intent": "Cancel draft reservations safely",
+      "rationale": "Developer requested draft cancellation and idempotent repeat behavior; retain sent-reservation behavior.",
+      "risk": "standard",
+      "change_type": "business",
+      "vocabulary": {
+        "draft": "Reservation not yet sent",
+        "cancelled": "Reservation cancelled by an explicit request"
+      },
+      "architecture": [
+        "Keep cancellation within existing reservation lifecycle boundary"
+      ],
+      "invariant_ids": [
+        "R1",
+        "R3"
+      ],
+      "required_checks": [
+        "reservation-behavior"
       ]
     }
   ],
@@ -36,7 +53,9 @@
       "actor": "developer",
       "revision": 2,
       "decision": "D1",
-      "source": "fictional-dialogue:1"
+      "source": "fictional-dialogue:1",
+      "presented_by": "architect",
+      "teach_back": "Draft cancellation changes state to cancelled; repeats succeed without another effect. Sent reservations retain the current rejection."
     },
     {
       "type": "submit_implementation",
@@ -56,9 +75,20 @@
       "revision": 2,
       "candidate": "production-B",
       "findings": [
-        "F1"
+        {
+          "id": "F1",
+          "classification": "new_scenario",
+          "scenario": "Should cancelling a draft send a notification?",
+          "requirements": [],
+          "evidence": "business-review:B:notifications",
+          "impact": "Potential extra side effect outside agreed cancellation behavior",
+          "question": "Should notifications be included in this change?"
+        }
       ],
-      "evidence": "business-review:B"
+      "evidence": "business-review:B",
+      "alignment": "aligned",
+      "review_order": "scenarios_then_implementation",
+      "scenario_basis": "contract:reservation-cancel:revision-2"
     },
     {
       "type": "provisionally_approve",
@@ -89,7 +119,14 @@
         "R2",
         "R3"
       ],
-      "evidence": "test-execution:B"
+      "evidence": "test-execution:B",
+      "checks": [
+        {
+          "id": "reservation-behavior",
+          "status": "pass",
+          "evidence": "test-execution:B:reservation-behavior"
+        }
+      ]
     },
     {
       "type": "accept",

@@ -6,11 +6,14 @@
 - Intent and business value:
 - Vocabulary (term, meaning, misleading synonym):
 - Scope / exclusions:
-- Risk and why:
+- Risk and why (trivial / routine / standard / critical):
+- Change type: technical | business
+- Architect teach-back of intended observable behavior, separate from recommended mechanism:
 - Architecture boundaries / allowed changes:
-- Invariants:
+- Invariants (stable IDs linked to required outcome checks):
+- Mandatory verification checks and rationale:
 
-| ID | Requirement / observable outcome | confirmed / existing / delegated / unknown | Source | In scope? | Decision or preservation authority |
+| ID | Requirement / observable outcome | confirmed / existing / delegated / unknown | Source | In scope? | Developer decision / bounded delegation |
 | --- | --- | --- | --- | --- | --- |
 
 For delegated items: owner, bounds, exclusions and escalation trigger.
@@ -22,7 +25,7 @@ Given / When / Then, including material negative outcomes. Link each to requirem
 
 ## Decisions and iteration
 
-Decision ID, developer statement/source, rationale, affected IDs, revisit trigger. Iteration budget and escalation owner.
+Decision ID, developer statement/source, rationale, affected IDs, revisit trigger. Escalation owner; stop when progress stalls or uncertainty appears. Ask unresolved material choices in the active conversation before proceeding; record the answer here afterward.
 
 ## Authorization
 

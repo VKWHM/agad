@@ -12,15 +12,18 @@ Status: **0.1.0 draft specification**, ready for developer review. This reposito
 flowchart TD
   D[Developer ↔ Architect: intent and domain dialogue] --> C[Developer approves versioned contract]
   C --> I[Implementer: production candidate]
-  I --> B[Business Reviewer: scenarios and questions]
+  I --> B[Business review or developer-approved trivial waiver]
   B --> A[Architect ↔ Developer: resolve findings]
   A -->|Revision| D
   A -->|Provisional approval of exact candidate| T[Test Engineer: approved outcomes]
-  T -->|Defect or unresolved semantics| D
+  T -->|Technical defect under unchanged contract| I
+  T -->|Unresolved business semantics| D
   T --> R[Developer: code review and final acceptance]
   R -->|Changes requested| D
   R -->|Accept| F[Accepted]
 ```
+
+Test scenario planning may begin from the approved contract before implementation finishes. Test writing and execution still require provisional developer approval.
 
 Scout assists the Architect when repository evidence is needed. Six roles do not require six simultaneous processes. Role boundaries and approval gates apply regardless of deployment.
 
@@ -33,7 +36,7 @@ Scout assists the Architect when repository evidence is needed. Six roles do not
 5. Record developer decisions using the [approval template](templates/approval.md).
 6. Validate records against the [governance rules](docs/governance.md).
 
-[Worked example](examples/reservation.md) · [machine-readable example](examples/accepted.json) · [DDD grounding](docs/ddd-grounding.md) · [open decisions](docs/decisions.md)
+[Source invariant audit](docs/invariants.md) · [Worked example](examples/reservation.md) · [machine-readable example](examples/accepted.json) · [DDD grounding](docs/ddd-grounding.md) · [recorded decisions](docs/decisions.md)
 
 ## Reference validation
 
@@ -48,4 +51,4 @@ The validator checks record structure, authority declarations, sequence, and evi
 
 ## Scope
 
-The core specifies responsibilities, terminology, workflow, contracts, escalation, and observable governance requirements. Harness-specific prompts, tool APIs, model identifiers, delegation mechanics, and integrations belong to a later separate project or adapter. No license is selected yet; see [open decisions](docs/decisions.md).
+The core specifies responsibilities, terminology, workflow, contracts, escalation, and observable governance requirements. Harness-specific prompts, tool APIs, model identifiers, delegation mechanics, and integrations belong to a later separate project or adapter. The repository remains private; public distribution and license selection are outside this change. Decisions that need the developer must be asked directly before proceeding.

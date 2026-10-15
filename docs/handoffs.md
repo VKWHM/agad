@@ -12,8 +12,12 @@ Every handoff includes `change_id`, contract ID/revision, sender role, recipient
 | Architect → Test Engineer | Provisional developer approval, finding dispositions, exact candidate, approved outcomes/invariants | Approval follows business review and covers current candidate |
 | Test Engineer → Architect → Developer | Delivery reference, covered/missing outcome IDs, actual commands/results, defects, gaps and risks | Required checks passed; gaps are explicit; code diff is available for human review |
 
+Business Reviewer first derives scenarios independently from approved requirements and invariants, then inspects the candidate. Reports include alignment, classification and impact; an IDs-only findings list is insufficient in the reference format.
+
 Each business finding includes an ID, classification, scenario, relevant requirement (or explicitly none), evidence, business impact, recommended question, and disposition. Dispositions are developer decision references: resolved under current contract, contract revision required, excluded with reason/revisit trigger, or accepted risk. Accepted risk cannot silently negate a mandatory approved outcome; change that contract first.
 
 Test reports distinguish failing implementation, invalid test, infrastructure blockage, and unresolved expected behavior. Unknown expected behavior returns to dialogue. A report of PASS with missing required checks is invalid. A bounded, developer-approved test gap must record reason, impact and revisit trigger before acceptance.
+
+The Architect must present the actual code diff, rationale, tests executed, architectural deviations, and remaining uncertainties for developer review. Feedback returns through intent reconciliation before implementation changes.
 
 See [templates](../templates/) for compact prose records. The JSON example demonstrates machine-checkable references, not a required storage format.

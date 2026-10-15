@@ -9,6 +9,6 @@
 - Explicit delegated choices and bounds:
 - Unknowns and stop conditions:
 - Required return artifact and validation:
-- Retry budget / escalation owner:
+- Progress evidence / escalation owner (stop when progress stalls or uncertainty appears):
 
 Return: outcome mapping, immutable artifact IDs, actual work/checks, deviations, unresolved decisions and remaining risks. State unavailable evidence plainly.
