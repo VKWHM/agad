@@ -4,7 +4,7 @@
 
 The developer owns business meaning and final acceptance. The Architect develops shared understanding through dialogue. Supporting roles explore, implement, discover business questions, and test approved outcomes.
 
-Status: **0.1.0 draft specification**, ready for developer review. This repository covers the abstraction only. No harness, model provider, orchestration runtime, or adapter is implemented.
+Status: **0.1.0 draft specification**, ready for developer review. This repository covers the abstraction only. The core has no harness or provider dependency. A separate experimental [Oh My Pi plugin](integrations/oh-my-pi/README.md) now provides the first technical integration.
 
 ## Required workflow
 
@@ -51,4 +51,4 @@ The validator checks record structure, authority declarations, sequence, and evi
 
 ## Scope
 
-The core specifies responsibilities, terminology, workflow, contracts, escalation, and observable governance requirements. Harness-specific prompts, tool APIs, model identifiers, delegation mechanics, and integrations belong to a later separate project or adapter. The repository remains private; public distribution and license selection are outside this change. Decisions that need the developer must be asked directly before proceeding.
+The core specifies responsibilities, terminology, workflow, contracts, escalation, and observable governance requirements. Harness-specific prompts, tool APIs, model identifiers and delegation mechanics stay inside dedicated adapter directories. The first implementation is [integrations/oh-my-pi](integrations/oh-my-pi/README.md); it calls the unchanged core validator. The repository remains private; public distribution and license selection are outside this change. Decisions that need the developer must be asked directly before proceeding.

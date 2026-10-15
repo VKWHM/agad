@@ -27,4 +27,4 @@ Specification 0.1.0 is a draft, not a claim of developer final acceptance. Integ
 
 ## Deferred scope
 
-Harness adapters, execution isolation, authentication storage, provider IDs and approval UI remain outside this stage. The private repository has no distribution license selected; licensing is not a dependency of this private abstraction work. Ask the owner directly if publication or distribution is proposed.
+Harness concerns remain outside the core. The developer subsequently requested a first modular OMP plugin inside `integrations/oh-my-pi`, with strict role mapping and native option/free-text questions. For its separate Decision Partner, the developer directly chose **Sol Medium, read-only, able to spawn/contact research Scouts**. This auxiliary advisor cannot approve work or change the six-role core model. The adapter implements those technical concerns separately; it is not a core dependency. The private repository has no distribution license selected; licensing is not a dependency of this private abstraction work. Ask the owner directly if publication or distribution is proposed.

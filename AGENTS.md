@@ -1,6 +1,6 @@
 # Working on AGAD
 
-Maintain a harness-independent core. Do not add provider model IDs, harness APIs, or execution-framework assumptions. Ask material policy choices directly in the active conversation before applying them. Record the answers afterward; never publish an unresolved decision list as a substitute for asking.
+Maintain a harness-independent core. Keep provider model IDs, harness APIs and execution-framework assumptions inside dedicated integration directories. The harness-independent core must never import them. Ask material policy choices directly in the active conversation before applying them. Record the answers afterward; never publish an unresolved decision list as a substitute for asking.
 
 Preserve the explicit workflow and human authority. Business Reviewer is not a code reviewer. Unknown business meaning must remain unknown until resolved or explicitly excluded by the developer.
 

@@ -1,0 +1,45 @@
+{
+  "revision": 2,
+  "requirements": [
+    {
+      "id": "R1",
+      "statement": "Cancel draft reservation",
+      "kind": "confirmed",
+      "source": "developer:D1",
+      "in_scope": true
+    },
+    {
+      "id": "R2",
+      "statement": "Preserve sent-reservation rejection",
+      "kind": "existing",
+      "source": "repo:snapshot-0:cancel",
+      "in_scope": true
+    },
+    {
+      "id": "R3",
+      "statement": "Repeated cancellation succeeds idempotently",
+      "kind": "confirmed",
+      "source": "developer:D1",
+      "in_scope": true
+    }
+  ],
+  "intent": "Cancel draft reservations safely",
+  "rationale": "Developer requested draft cancellation and idempotent repeat behavior; retain sent-reservation behavior.",
+  "risk": "standard",
+  "change_type": "business",
+  "vocabulary": {
+    "draft": "Reservation not yet sent",
+    "cancelled": "Reservation cancelled by an explicit request"
+  },
+  "architecture": [
+    "Keep cancellation within existing reservation lifecycle boundary"
+  ],
+  "invariant_ids": [
+    "R1",
+    "R3"
+  ],
+  "required_checks": [
+    "reservation-behavior"
+  ],
+  "teach_back": "Draft cancellation changes state to cancelled; repeats succeed without another effect. Sent reservations retain the current rejection."
+}

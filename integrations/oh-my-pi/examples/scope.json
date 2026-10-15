@@ -1,0 +1,15 @@
+{
+  "production": [
+    "src/reservations"
+  ],
+  "tests": [
+    "tests/reservations"
+  ],
+  "checks": {
+    "reservation-behavior": [
+      "bun",
+      "test",
+      "tests/reservations"
+    ]
+  }
+}
