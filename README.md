@@ -1,2 +1,51 @@
-# agad
-Architecture-Governed Agentic Development: a developer-centered, harness-independent operating model.
+# AGAD
+
+**Architecture-Governed Agentic Development** is a developer-centered operating model for collaborating with AI coding agents.
+
+The developer owns business meaning and final acceptance. The Architect develops shared understanding through dialogue. Supporting roles explore, implement, discover business questions, and test approved outcomes.
+
+Status: **0.1.0 draft specification**, ready for developer review. This repository covers the abstraction only. No harness, model provider, orchestration runtime, or adapter is implemented.
+
+## Required workflow
+
+```mermaid
+flowchart TD
+  D[Developer ↔ Architect: intent and domain dialogue] --> C[Developer approves versioned contract]
+  C --> I[Implementer: production candidate]
+  I --> B[Business Reviewer: scenarios and questions]
+  B --> A[Architect ↔ Developer: resolve findings]
+  A -->|Revision| D
+  A -->|Provisional approval of exact candidate| T[Test Engineer: approved outcomes]
+  T -->|Defect or unresolved semantics| D
+  T --> R[Developer: code review and final acceptance]
+  R -->|Changes requested| D
+  R -->|Accept| F[Accepted]
+```
+
+Scout assists the Architect when repository evidence is needed. Six roles do not require six simultaneous processes. Role boundaries and approval gates apply regardless of deployment.
+
+## Read and use
+
+1. Read [principles](docs/principles.md) and [role boundaries](docs/roles.md).
+2. Follow the [workflow and gates](docs/workflow.md).
+3. Copy the [Living Domain Contract](templates/living-domain-contract.md) for one small change.
+4. Exchange [handoff records](docs/handoffs.md), preserving exact contract and candidate references.
+5. Record developer decisions using the [approval template](templates/approval.md).
+6. Validate records against the [governance rules](docs/governance.md).
+
+[Worked example](examples/reservation.md) · [machine-readable example](examples/accepted.json) · [DDD grounding](docs/ddd-grounding.md) · [open decisions](docs/decisions.md)
+
+## Reference validation
+
+Python 3.10+ standard library only; no installation or network required:
+
+```sh
+python3 tools/validate.py examples/accepted.json
+python3 -m unittest discover -s tests -v
+```
+
+The validator checks record structure, authority declarations, sequence, and evidence freshness. It cannot authenticate a human, inspect production changes, or prove business correctness. A future runtime must enforce permissions and verify approval evidence. Python is a reference-checking choice, not a required implementation language for AGAD.
+
+## Scope
+
+The core specifies responsibilities, terminology, workflow, contracts, escalation, and observable governance requirements. Harness-specific prompts, tool APIs, model identifiers, delegation mechanics, and integrations belong to a later separate project or adapter. No license is selected yet; see [open decisions](docs/decisions.md).

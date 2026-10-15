@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "change_id": "reservation-cancel",
+  "contracts": [
+    {
+      "revision": 2,
+      "requirements": [
+        {
+          "id": "R1",
+          "statement": "Cancel draft reservation",
+          "kind": "confirmed",
+          "source": "developer:D1",
+          "in_scope": true
+        },
+        {
+          "id": "R2",
+          "statement": "Preserve sent-reservation rejection",
+          "kind": "existing",
+          "source": "repo:snapshot-0:cancel",
+          "in_scope": true,
+          "preservation_decision": "D1"
+        },
+        {
+          "id": "R3",
+          "statement": "Repeated cancellation succeeds idempotently",
+          "kind": "confirmed",
+          "source": "developer:D1",
+          "in_scope": true
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "approve_contract",
+      "actor": "developer",
+      "revision": 2,
+      "decision": "D1",
+      "source": "fictional-dialogue:1"
+    },
+    {
+      "type": "submit_implementation",
+      "actor": "implementer",
+      "revision": 2,
+      "candidate": "production-B",
+      "outcomes": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "evidence": "implementation-report:B"
+    },
+    {
+      "type": "submit_business_review",
+      "actor": "business_reviewer",
+      "revision": 2,
+      "candidate": "production-B",
+      "findings": [
+        "F1"
+      ],
+      "evidence": "business-review:B"
+    },
+    {
+      "type": "provisionally_approve",
+      "actor": "developer",
+      "revision": 2,
+      "candidate": "production-B",
+      "decision": "D2",
+      "source": "fictional-dialogue:2",
+      "presented_by": "architect",
+      "dispositions": {
+        "F1": {
+          "action": "excluded",
+          "reason": "Notifications outside this change",
+          "revisit": "Notification feature requested"
+        }
+      }
+    },
+    {
+      "type": "submit_tests",
+      "actor": "test_engineer",
+      "revision": 2,
+      "candidate": "production-B",
+      "delivery": "delivery-B",
+      "report": "test-report:B",
+      "status": "pass",
+      "covered": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "evidence": "test-execution:B"
+    },
+    {
+      "type": "accept",
+      "actor": "developer",
+      "revision": 2,
+      "candidate": "production-B",
+      "delivery": "delivery-B",
+      "report": "test-report:B",
+      "decision": "D3",
+      "source": "fictional-dialogue:3",
+      "code_review": "review-of-delivery:B"
+    }
+  ]
+}
