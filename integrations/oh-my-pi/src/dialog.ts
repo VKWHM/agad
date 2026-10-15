@@ -1,10 +1,12 @@
 import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent";
 import type { HumanAnswer, PendingQuestion } from "./types.ts";
 import { pendingPresentation } from "./presentation.ts";
+import { runTmuxConsultation } from "./consultation-pane.ts";
 export interface DialogPort {
   ui: ExtensionUIContext;
   save(): void;
   current?(): void;
+  tmuxConsultation?: boolean;
   partner(prompt: string, signal?: AbortSignal): Promise<string>;
 }
 // The host returns labels, not option IDs. Reserve distinct presentation-only
@@ -113,6 +115,16 @@ export async function askPending(
       if (answer?.custom?.trim() || answer?.selected) return answer;
       continue;
     }
+    // In tmux, keep the OMP view on the left and run the private conversation
+    // in a smaller right pane. Failed/unavailable tmux uses the explicit native fallback.
+    const pane = await runTmuxConsultation(pending, port, signal, port.tmuxConsultation !== false);
+    if (signal?.aborted) return;
+    if (pane.opened) {
+      if (pane.reason) port.ui.notify(`Consultation pane stopped: ${pane.reason}`, "error");
+      port.current?.();
+      continue;
+    }
+    if (pane.reason) port.ui.notify(pane.reason, "info");
     // No parent message is sent, no new Architect turn starts, no approval is recorded.
     while (!signal?.aborted) {
       const prompt = await port.ui.input(
