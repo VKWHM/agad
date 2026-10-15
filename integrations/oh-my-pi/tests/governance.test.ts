@@ -308,3 +308,78 @@ test("identity guard aborts explicitly because OMP isolates hook exceptions", ()
   ).toThrow();
   expect(aborted).toBe(true);
 });
+
+test("stale candidate rejection during approval unblocks question and returns error", async () => {
+  const cwd = await workspace();
+  await writeFile(join(cwd, "src", "domain.ts"), "v1");
+  const candidate = await fingerprint(cwd, ["src"]);
+  const entries: unknown[] = [];
+  const pi = {
+    appendEntry: (_type: unknown, state: unknown) => entries.push(state),
+  } as unknown as ExtensionAPI;
+  const controller = new Controller(pi, "openai-codex");
+  controller.state = {
+    phase: "reviewed",
+    scope: { production: ["src"], tests: ["tests"], checks: {} },
+    record: {
+      ...structuredClone(source),
+      events: [
+        ...source.events.slice(0, 3),
+      ],
+    },
+    pending: {
+      id: "checkpoint-q",
+      question: "Provisional approval",
+      options: [{ label: "Approve" }, { label: "Request changes" }],
+      context: "context",
+      consultation: [],
+      event: {
+        type: "provisionally_approve",
+        actor: "developer",
+        revision: 1,
+        candidate,
+        finding_dispositions: [],
+      },
+    },
+  };
+  // Simulate modifying production file before developer answers
+  await writeFile(join(cwd, "src", "domain.ts"), "v2 modified");
+  const ctx = {
+    cwd,
+    hasUI: true,
+    ui: {
+      askDialog: async () => ({
+        kind: "submit",
+        results: [{ id: "checkpoint-q", selectedOptions: ["Approve"] }],
+      }),
+    },
+  } as unknown as ExtensionContext;
+
+  const result = await controller.resume(ctx);
+  expect(result.status).toBe("answered");
+  expect(result.approved).toBe(false);
+  expect(result.error).toContain("Production changed after implementation");
+  expect(controller.state.pending).toBeUndefined();
+  expect(entries.length).toBeGreaterThan(0);
+});
+
+test("cancelPending clears pending question and unblocks state", () => {
+  const entries: unknown[] = [];
+  const pi = {
+    appendEntry: (_type: unknown, state: unknown) => entries.push(state),
+  } as unknown as ExtensionAPI;
+  const controller = new Controller(pi, "openai-codex");
+  expect(controller.cancelPending()).toBeUndefined();
+  controller.state.pending = {
+    id: "q-1",
+    question: "Do something",
+    options: [{ label: "Yes" }, { label: "No" }],
+    context: "test",
+    consultation: [],
+  };
+  const cancelled = controller.cancelPending();
+  expect(cancelled?.id).toBe("q-1");
+  expect(controller.state.pending).toBeUndefined();
+  expect(entries.length).toBe(1);
+});
+

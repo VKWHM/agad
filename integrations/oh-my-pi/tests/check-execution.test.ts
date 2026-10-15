@@ -54,7 +54,7 @@ async function verification(changeTests: boolean, changeDuringCommand = false) {
                 { id: "reservation-behavior" },
                 undefined,
                 undefined,
-                {},
+                new AbortController().signal,
               );
               if (changeTests)
                 await writeFile(

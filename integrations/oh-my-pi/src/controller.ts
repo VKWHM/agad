@@ -4,6 +4,7 @@ import { askPending, isExplicitApproval } from "./dialog.ts";
 import { checkpointPresentation } from "./presentation.ts";
 import { fingerprint, safePath } from "./scope.ts";
 import { runSession } from "./sessions.ts";
+import { markdownBrief } from "./prompts.ts";
 import { readTools } from "./roles.ts";
 import type { Role } from "./roles.ts";
 import {
@@ -13,6 +14,7 @@ import {
   type PendingQuestion,
   type Scope,
 } from "./types.ts";
+import { normalizeContract, normalizeScope } from "./contract-normalization.ts";
 const humanTypes = new Set([
   "approve_contract",
   "waive_business_review",
@@ -146,18 +148,23 @@ export class Controller {
           runSession(this.pi, ctx, this.provider, {
             role: "decision_partner",
             signal: childSignal,
-            prompt: JSON.stringify({
-              pending_question: {
-                question: pending.question,
-                options: pending.options,
-                context: pending.context,
+            prompt: markdownBrief(
+              prompt,
+              {
+                "Pending question": {
+                  question: pending.question,
+                  options: pending.options,
+                  context: pending.context,
+                },
+                "Approved contract": this.state.record
+                  ? this.currentOrDraft()
+                  : null,
+                "Private consultation": pending.consultation
+                  .map((turn) => `${turn.speaker === "developer" ? "Developer" : "Decision Partner"}:\n${turn.text}`)
+                  .join("\n\n"),
               },
-              approved_contract: this.state.record
-                ? this.currentOrDraft()
-                : null,
-              consultation: pending.consultation,
-              developer_request: prompt,
-            }),
+              "Discuss the pending question in concise Markdown. Research files or the web as needed; use agad_research for read-only Scout delegation. This conversation is advisory, not an answer or approval. Keep unknown business meaning explicit.",
+            ),
           }),
       },
       signal,
@@ -166,16 +173,28 @@ export class Controller {
     // Cancellation keeps question and contract context intact; no invented default.
     if (!answer) return { status: "pending", question_id: pending.id };
     if (pending.event && isExplicitApproval(answer)) {
-      if (pending.event.type !== "approve_contract")
-        await this.freshIfCandidate(ctx, pending.event);
-      await this.commit({
-        ...pending.event,
-        actor: "developer",
-        decision: `human:${crypto.randomUUID()}`,
-        source: `omp:question:${pending.id}`,
-      });
-      if (pending.event.type === "approve_contract" && pending.scope)
-        this.state.scope = structuredClone(pending.scope);
+      try {
+        if (pending.event.type !== "approve_contract")
+          await this.freshIfCandidate(ctx, pending.event);
+        await this.commit({
+          ...pending.event,
+          actor: "developer",
+          decision: `human:${crypto.randomUUID()}`,
+          source: `omp:question:${pending.id}`,
+        });
+        if (pending.event.type === "approve_contract" && pending.scope)
+          this.state.scope = structuredClone(pending.scope);
+      } catch (error) {
+        this.state.pending = undefined;
+        this.save();
+        return {
+          status: "answered",
+          question_id: pending.id,
+          answer,
+          approved: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
     }
     this.state.pending = undefined;
     this.save();
@@ -185,6 +204,13 @@ export class Controller {
       answer,
       approved: !!pending.event && isExplicitApproval(answer),
     };
+  }
+  cancelPending() {
+    const pending = this.state.pending;
+    if (!pending) return undefined;
+    this.state.pending = undefined;
+    this.save();
+    return pending;
   }
   currentOrDraft() {
     try {
@@ -279,19 +305,23 @@ export class Controller {
       throw new Error(
         "Use a new OMP session for an independently scoped change",
       );
-    if (!scope.production.length)
+
+    const normalizedScope = normalizeScope(scope);
+    const normalizedContract = normalizeContract(contract, normalizedScope.checks);
+
+    if (!normalizedScope.production.length)
       throw new Error("Production scope cannot be empty");
-    for (const path of [...scope.production, ...scope.tests])
+    for (const path of [...normalizedScope.production, ...normalizedScope.tests])
       await safePath(ctx.cwd, path);
     // Production and test scope cannot overlap: test writes must preserve the candidate.
-    for (const production of scope.production)
-      for (const test of scope.tests) {
+    for (const production of normalizedScope.production)
+      for (const test of normalizedScope.tests) {
         const p = await safePath(ctx.cwd, production),
           t = await safePath(ctx.cwd, test);
         if (p === t || p.startsWith(t + "/") || t.startsWith(p + "/"))
           throw new Error("Production and test scopes must be disjoint");
       }
-    for (const [id, argv] of Object.entries(scope.checks))
+    for (const [id, argv] of Object.entries(normalizedScope.checks))
       if (
         !id.trim() ||
         !argv.length ||
@@ -299,8 +329,8 @@ export class Controller {
       )
         throw new Error("Checks need nonempty exact argv arrays");
     if (
-      JSON.stringify(Object.keys(scope.checks).sort()) !==
-      JSON.stringify([...contract.required_checks].sort())
+      JSON.stringify(Object.keys(normalizedScope.checks).sort()) !==
+      JSON.stringify([...normalizedContract.required_checks].sort())
     )
       throw new Error(
         "Every required check needs exactly one developer-visible command",
@@ -313,17 +343,17 @@ export class Controller {
         events: [],
       },
     );
-    if (record.contracts.some((c: Json) => c.revision === contract.revision))
+    if (record.contracts.some((c: Json) => c.revision === normalizedContract.revision))
       throw new Error(
         "Contract revisions are immutable; choose a new revision",
       );
-    record.contracts.push(structuredClone(contract));
+    record.contracts.push(structuredClone(normalizedContract));
     const event = {
       type: "approve_contract",
       actor: "developer",
-      revision: contract.revision,
+      revision: normalizedContract.revision,
       presented_by: "architect",
-      teach_back: contract.teach_back,
+      teach_back: normalizedContract.teach_back,
     };
     await append(record, {
       ...event,
@@ -332,7 +362,7 @@ export class Controller {
     });
     this.state.record = record;
     this.save();
-    return this.checkpoint(ctx, event, signal, scope);
+    return this.checkpoint(ctx, event, signal, normalizedScope);
   }
   async plan(
     ctx: ExtensionContext,
@@ -436,36 +466,39 @@ export class Controller {
         childSignal?.removeEventListener("abort", abort);
       }
     };
+    const context = {
+      contract,
+      developer_decisions:
+        this.state.record?.events.filter(
+          (e: Json) =>
+            e.actor === "developer" && e.revision === contract?.revision,
+        ) ?? [],
+      business_review: this.state.record?.events
+        .toReversed()
+        .find(
+          (e: Json) =>
+            ["submit_business_review", "waive_business_review"].includes(
+              e.type,
+            ) && e.revision === contract?.revision,
+        ),
+      scope: this.state.scope,
+      candidate:
+        expected && role !== "implementer" ? this.candidate() : undefined,
+    };
+    const instruction =
+      role === "scout"
+        ? "Return concise Markdown with findings, source paths/URLs and explicit uncertainty. Do not invent business decisions."
+        : "Return only one JSON object with the role report event fields required by the AGAD core. Do not set actor, revision or candidate; host binds them.";
     const output = await runSession(this.pi, ctx, this.provider, {
       role,
       critical: contract?.risk === "critical",
       signal,
       scope: this.state.scope,
       runCheck,
-      prompt: JSON.stringify({
-        task,
-        contract,
-        developer_decisions:
-          this.state.record?.events.filter(
-            (e: Json) =>
-              e.actor === "developer" && e.revision === contract?.revision,
-          ) ?? [],
-        business_review: this.state.record?.events
-          .toReversed()
-          .find(
-            (e: Json) =>
-              ["submit_business_review", "waive_business_review"].includes(
-                e.type,
-              ) && e.revision === contract?.revision,
-          ),
-        scope: this.state.scope,
-        candidate:
-          expected && role !== "implementer" ? this.candidate() : undefined,
-        instruction:
-          role === "scout"
-            ? "Return evidence and uncertainty."
-            : "Return only one JSON object with the role report event fields required by the AGAD core. Do not set actor, revision or candidate; host binds them.",
-      }),
+      // Preserve the working Test Engineer's input and output contract.
+      prompt: role === "test_engineer"
+        ? JSON.stringify({ task, ...context, instruction })
+        : markdownBrief(task, context, instruction),
     });
     if (role === "scout") return output;
     const report: Json = JSON.parse(output);

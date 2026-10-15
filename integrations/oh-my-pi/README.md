@@ -37,11 +37,12 @@ The Developer is the human authority, not another model. Role definitions live i
 
 ## Think with a partner while a question stays open
 
-1. Architect presents the native OMP question with answer options. You may choose an option or type your own answer.
-2. Select **Chat about this — Decision Partner**, an explicit AGAD choice in both rich questions and fallback selectors. It does not depend on the installed host providing a native chat row; native `kind: "chat"` results remain supported. If an original option already uses the action label, AGAD adds a numeric suffix to its own action only, preserving the original option.
-3. Ask it to critique a proposal, compare decisions, inspect the architecture, or find evidence. It can call `agad_research`, which creates a strictly read-only Luna Low Scout. Follow-up requests include the consultation transcript, preserving the discussion.
-4. Return to the original Architect question. Its ID, options, context, revision and candidate have not changed.
-5. Submit your answer. Only that final answer and an optional human note go to Architect; consultation does not enter the Architect's model history or authorize work. You can explicitly include insights in your typed answer.
+1. Architect presents the native OMP question with its original answer options. You may choose an option or type your own answer.
+2. Select **Chat about this — Decision Partner**, an explicit AGAD action in both rich questions and fallback selectors. It does not depend on a host-native chat row; native `kind: "chat"` results remain supported. If an original option already uses the action label, only AGAD's action receives a numeric suffix.
+3. When OMP is running inside tmux with tmux and Bun available, AGAD opens a real horizontal split: OMP remains on the left and a smaller 38% consultation pane opens on the right. The pane shows the unchanged question, complete context, options and saved consultation transcript, with a composer for follow-ups. Enter `/return` or close the pane to return to the same question. The transcript is saved in `pending.consultation`, so it reappears if you reopen the pane.
+4. If tmux or the Bun runtime is unavailable, OMP is not running in a tmux pane, or the consultation pane cannot be started, AGAD visibly explains that no split pane is available and uses OMP's existing native consultation dialogs instead; it does not claim to have opened a split. In either UI, the same Decision Partner callback can use read-only sources/tools and `agad_research` for a strictly read-only Luna Low Scout.
+5. Return to the original Architect question. Its ID, options, context, revision and candidate have not changed. Submit your answer only when ready.
+6. Only that final human answer and an optional note go to Architect; consultation does not enter Architect's model history or authorize work. You can explicitly include insights in your typed answer.
 
 ```mermaid
 flowchart LR
@@ -53,11 +54,13 @@ flowchart LR
   Q -->|Explicit human submission| R[Architect receives the answer]
 ```
 
-Cancelling preserves the pending question. Use `/agad-question` to resume it after interruption or reopening a saved session. `/agad-status` shows the current state without a model turn. While a question is pending, dependent delegation is blocked. Branch/session switches are refused during an active adapter operation; late dialog responses are checked against their original session generation.
+Cancelling or closing the consultation pane preserves the pending question. Use `/agad-question` to resume it after interruption or reopening a saved session. `/agad-cancel` dismisses a pending question without approving, clearing the question lock. `/agad-status` shows the current state without a model turn. While a question is pending, dependent delegation is blocked. Branch/session switches are refused during an active adapter operation; late dialog responses are checked against their original session generation.
 
 For approvals, the human must explicitly select **Approve**. Free text such as “approve after changing X,” a timeout, cancellation, the Partner's recommendation or silence is never approval. Human checkpoints use readable names (for example, **Contract approval** and **Final acceptance**) and event-specific outcome-first summaries. Contract approval explains implementation authority using the contract teach-back/intent. A business review waiver waives only reviewer review for the exact candidate, with its supplied rationale; it grants neither testing nor final acceptance. Provisional approval authorizes testing with the supplied finding dispositions, not final acceptance. Test-gap approval identifies the exact affected outcome IDs and supplied reason, impact and revisit trigger, waiving coverage only, not feature behavior, invariants or mandatory checks. Final acceptance binds the candidate, delivery and report after human code review. Cancellation stops the change rather than delivering the feature. Unknown checkpoint types explicitly leave authority unknown and direct the human to full details and Architect. Summaries include supplied revision/candidate identifiers and consequential event fields; long values may be shortened, with exact values available through Review full details. Hosts without the rich dialog receive native selection plus text-input dialogs. Human decisions require an interactive UI; headless operation fails closed.
 
-The consultation action is presentation-only and never becomes a final answer. Mixed rich-dialog selections (multiple choices, or a choice combined with custom input) cannot approve; cancellation or timeout leaves the question pending. Returning from consultation, cancelling its input, or a Partner failure returns to the unchanged question unless the enclosing request was aborted.
+The consultation action and its pane are presentation-only: they never become a final answer. Mixed rich-dialog selections (multiple choices, or a choice combined with custom input) cannot approve; cancellation, timeout, returning from consultation or a Partner error leaves the question pending. Closing the pane cancels an active Partner request and discards no already-saved transcript turns. No consultation message, result or pane control grants approval.
+
+Run `python3 tests/smoke-ui.py` from this directory to exercise the real tmux pane lifecycle with a deterministic Partner fixture and no model calls. It requires installed `omp` and `tmux`.
 
 ### Review full checkpoint details
 
@@ -69,6 +72,14 @@ The report is stored with a new pending checkpoint as presentation only; the exi
 
 Closing, cancelling or editing the details editor discards its returned text and reopens the same pending question (unless the enclosing request is aborted). It cannot change the payload, resolve the question or approve anything. Session-generation and pending-question identity checks still apply, and only a subsequent explicit **Approve** retains approval authority. AGAD does not customize the native editor or footer.
 
+
+## Agent handoff format
+
+Developer selected **Markdown handoffs; validated records**. Implementer, Business Reviewer and Scout receive a Markdown task brief with separate instructions and context sections. Decision Partner receives a question-scoped Markdown brief and private conversation transcript; Scout and Partner advice is concise Markdown with sources and explicit uncertainty. Exact contract, decision, scope, candidate and option values remain compact JSON inside fenced context sections rather than being paraphrased. Embedded backticks cannot prematurely close those fences.
+
+Authoritative implementation, business-review and test reports still use the existing JSON core event contract and reference validator. Markdown advice cannot create developer approval. Test Engineer planning, worker input/output contract and approved-check execution are unchanged. No SDK structured-output mode or new serialization dependency was added.
+
+The research supports concise briefs, isolated context and progressive disclosure—not a universal fastest serialization. [Anthropic's production multi-agent system](https://www.anthropic.com/engineering/multi-agent-research-system) uses condensed results and artifact references; [Superpowers](https://github.com/obra/superpowers/blob/main/skills/subagent-driven-development/implementer-prompt.md) uses Markdown briefs and report files. Existing AGAD write restrictions are retained: this change does not give read-only roles artifact-write permission. [TOON's own guidance](https://github.com/toon-format/toon#when-not-to-use-toon) notes that compact JSON may win for deeply nested or non-uniform data. No AGAD token-cost or latency improvement is claimed without measurement.
 
 ## Governed development
 

@@ -5,6 +5,11 @@ import { Controller, architectTools } from "./controller.ts";
 import { assertIdentity, resolveModel, type Role } from "./roles.ts";
 import { rolePrompt } from "./prompts.ts";
 import type { Json, Scope } from "./types.ts";
+import {
+  formatWorkerReferences,
+  latestWorkerReferences,
+} from "./worker-history.ts";
+import { parseJsonArg } from "./contract-normalization.ts";
 
 export default function agad(pi: ExtensionAPI) {
   const provider = process.env.AGAD_OMP_PROVIDER ?? "openai-codex";
@@ -131,9 +136,19 @@ export default function agad(pi: ExtensionAPI) {
       "Present a complete versioned core contract and exact role scopes/check argv for explicit developer approval. Contract JSON includes teach_back. No execution is authorized until approved.",
     approval: "read",
     parameters: z.object({
-      change_id: z.string(),
-      contract_json: z.string(),
-      scope_json: z.string(),
+      change_id: z
+        .string()
+        .describe("Unique kebab-case change identifier, e.g. 'checkout-redeem-handoff'"),
+      contract_json: z
+        .string()
+        .describe(
+          "Living Domain Contract JSON string: { revision: number, intent: string, rationale: string, vocabulary: Record<string, string>, architecture: string[], risk: 'trivial'|'routine'|'standard'|'critical', change_type: 'business'|'technical', requirements: Array<{ id: string, statement: string, source: string, in_scope: boolean, kind: 'confirmed'|'existing'|'delegated'|'unknown' }>, invariant_ids: string[], required_checks: string[], teach_back: string }",
+        ),
+      scope_json: z
+        .string()
+        .describe(
+          "Scope JSON string: { production: string[], tests: string[], checks: Record<string, string[]> } where checks maps each check ID from required_checks to its exact command argv array, e.g. { \"test\": [\"bunx\", \"nx\", \"test\", \"@birbase/checkout\"] }",
+        ),
     }),
     async execute(_id, args, signal, _update, ctx) {
       return exclusive(async () =>
@@ -141,8 +156,8 @@ export default function agad(pi: ExtensionAPI) {
           await controller.contract(
             ctx,
             (args as { change_id: string }).change_id,
-            JSON.parse((args as { contract_json: string }).contract_json),
-            JSON.parse((args as { scope_json: string }).scope_json) as Scope,
+            parseJsonArg((args as any).contract_json, "contract_json"),
+            parseJsonArg((args as any).scope_json, "scope_json"),
             signal,
           ),
         ),
@@ -156,9 +171,13 @@ export default function agad(pi: ExtensionAPI) {
       "Ask one concrete question with 2–5 options. Native free text and Chat about this are available. Consultation stays private; only the final human answer returns to Architect.",
     approval: "read",
     parameters: z.object({
-      question: z.string(),
-      options: z.array(z.string()),
-      context: z.string(),
+      question: z.string().describe("The decision question to ask the developer"),
+      options: z
+        .array(z.string())
+        .describe("2–5 distinct concrete options for the developer to select from"),
+      context: z
+        .string()
+        .describe("Concise context explaining why this question is being asked"),
     }),
     async execute(_id, args, signal, _update, ctx) {
       return exclusive(async () => {
@@ -195,13 +214,19 @@ export default function agad(pi: ExtensionAPI) {
     description:
       "Propose a core human checkpoint event. Actor, decision and statement source are supplied only by the human UI. Supports provisional approval, exact trivial waiver, test gap, acceptance and cancellation.",
     approval: "read",
-    parameters: z.object({ event_json: z.string() }),
+    parameters: z.object({
+      event_json: z
+        .string()
+        .describe(
+          "Human checkpoint event JSON: { type: 'provisionally_approve' | 'accept' | 'waive_business_review' | 'approve_test_gap' | 'cancel', revision: number, ... }",
+        ),
+    }),
     async execute(_id, args, signal, _update, ctx) {
       return exclusive(async () =>
         result(
           await controller.checkpoint(
             ctx,
-            JSON.parse((args as { event_json: string }).event_json),
+            parseJsonArg((args as any).event_json, "event_json"),
             signal,
           ),
         ),
@@ -212,9 +237,16 @@ export default function agad(pi: ExtensionAPI) {
     name: "agad_plan_tests",
     label: "Plan tests early",
     description:
-      "Read-only Test Engineer scenario planning against approved outcomes. Does not write or execute tests or authorize testing.",
+      "Read-only Test Engineer scenario planning against approved outcomes. Requires an approved contract first. Does not write or execute tests or authorize testing.",
     approval: "read",
-    parameters: z.object({ task: z.string(), outcomes: z.array(z.string()) }),
+    parameters: z.object({
+      task: z.string().describe("Specific scenario planning task description"),
+      outcomes: z
+        .array(z.string())
+        .describe(
+          "List of approved requirement outcome IDs (e.g. ['R1']) from the approved contract",
+        ),
+    }),
     async execute(_id, args, signal, _update, ctx) {
       const input = args as { task: string; outcomes: string[] };
       return exclusive(async () =>
@@ -256,11 +288,18 @@ export default function agad(pi: ExtensionAPI) {
     description:
       "Record only an Architect control event: revise, request_repair, request_test_correction, block, resume. Never supplies human or worker reports.",
     approval: "read",
-    parameters: z.object({ event_json: z.string() }),
+    parameters: z.object({
+      event_json: z
+        .string()
+        .describe(
+          "Architect control event JSON: { type: 'revise' | 'request_repair' | 'request_test_correction' | 'block' | 'resume', reason: string, ... }",
+        ),
+    }),
     async execute(_id, args) {
       return exclusive(async () => {
-        const event: Json = JSON.parse(
+        const event: Json = parseJsonArg(
           (args as { event_json: string }).event_json,
+          "event_json",
         );
         if (
           ![
@@ -288,7 +327,10 @@ export default function agad(pi: ExtensionAPI) {
       "Resume the unchanged pending Architect question, with Decision Partner consultation",
     handler: async (_args, ctx) => {
       const answer = await exclusive(() => controller.resume(ctx));
-      if (answer.status === "answered")
+      if (answer.status === "answered") {
+        if (answer.error) {
+          ctx.ui.notify(`Approval was blocked: ${answer.error}`, "error");
+        }
         pi.sendMessage(
           {
             customType: "agad.human-answer",
@@ -297,6 +339,42 @@ export default function agad(pi: ExtensionAPI) {
           },
           { triggerTurn: true },
         );
+      }
+    },
+  });
+  pi.registerCommand("agad-cancel", {
+    description: "Dismiss the pending developer question without approving",
+    handler: async (_args, ctx) => {
+      const cancelled = controller.cancelPending();
+      if (!cancelled) {
+        ctx.ui.notify("No pending question to cancel", "info");
+        return;
+      }
+      ctx.ui.notify("Pending question cancelled", "info");
+      pi.sendMessage(
+        {
+          customType: "agad.human-answer",
+          content: JSON.stringify({
+            status: "cancelled",
+            question_id: cancelled.id,
+            approved: false,
+          }),
+          display: true,
+        },
+        { triggerTurn: true },
+      );
+    },
+  });
+  pi.registerCommand("agad-workers", {
+    description: "List persisted AGAD worker sessions for this OMP history",
+    handler: async (_args, ctx) => {
+      const workers = latestWorkerReferences(ctx.sessionManager.getEntries());
+      const inspection =
+        workers.length === 0
+          ? ""
+          : "\n\nLoad an exact JSONL with the OMP SDK's `SessionManager.open(path)` or select it in OMP's session-history UI. " +
+            "Opening/resuming is interactive and does not restore AGAD's temporary role restrictions.";
+      ctx.ui.notify(`${formatWorkerReferences(workers)}${inspection}`, "info");
     },
   });
 }
