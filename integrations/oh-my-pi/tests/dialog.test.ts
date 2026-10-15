@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent";
 import { askPending, isExplicitApproval } from "../src/dialog.ts";
+import { checkpointPresentation } from "../src/presentation.ts";
 import type { PendingQuestion } from "../src/types.ts";
 const pending = (): PendingQuestion => ({
   id: "question-1",
@@ -152,4 +153,109 @@ test("wrong question IDs cannot resolve a pending question", async () => {
     partner: async () => "",
   });
   expect(result).toBeUndefined();
+});
+test("rich and fallback dialogs expose distinct consultation and details actions", async () => {
+  for (const rich of [true, false]) {
+    const question = pending();
+    question.options = [
+      { label: "Review full details" },
+      { label: "Chat about this — Decision Partner" },
+      { label: "Approve" },
+    ];
+    question.event = { type: "approve_contract" } as PendingQuestion["event"];
+    question.context = JSON.stringify({
+      event: { type: "approve_contract" },
+      contract: { intent: "Authorize only implementation" },
+    });
+    let labels: string[] = [];
+    const answer = await askPending(question, {
+      save() {},
+      partner: async () => "private advice",
+      ui: ui({
+        askDialog: rich
+          ? async (dialogs: { options: { label: string }[] }[]) => {
+              labels = dialogs[0].options.map((option) => option.label);
+              return submit("Review full details");
+            }
+          : undefined,
+        select: rich
+          ? undefined
+          : async (_question: string, options: string[]) => {
+              labels = options;
+              return "Review full details";
+            },
+        input: async () => undefined,
+      }),
+    });
+    expect(labels).toContain("Review full details (2)");
+    expect(labels).toContain("Chat about this — Decision Partner (2)");
+    expect(answer?.selected).toBe("Review full details");
+  }
+});
+
+test("details display preserves exact nested payload and discards editor changes", async () => {
+  const payload = {
+    event: { type: "provisionally_approve", dispositions: { R7: { reason: "exact" } } },
+    contract: { requirements: [{ id: "R7", provenance: { source: "architect:decision" } }] },
+    scope: { production: ["src/**"], tests: ["tests/**"] },
+    checks: { typecheck: ["bun", "run", "--cwd", "adapter", "typecheck"] },
+    checkpoint: { evidence: "long/nested/☃", legacy: { unknown: [1, { keep: true }] } },
+  };
+  const question = pending();
+  question.event = payload.event as PendingQuestion["event"];
+  question.context = JSON.stringify(payload);
+  let editors = 0;
+  let prompts: { question: string }[] = [];
+  const answer = await askPending(question, {
+    save() {},
+    partner: async () => "",
+    ui: ui({
+      askDialog: async (dialogs: { question: string }[]) => {
+        prompts.push(dialogs[0]);
+        return editors++ === 0
+          ? { kind: "submit", results: [{ id: question.id, selectedOptions: ["Review full details"] }] }
+          : submit("Request changes");
+      },
+      editor: async (_title: string, content: string) => {
+        for (const value of ["provisional", "bun", "run", "--cwd", "adapter", "R7", "☃", "unknown", "true"])
+          expect(content).toContain(value);
+        return "edited payload that must not be submitted";
+      },
+    }),
+  });
+  expect(editors).toBe(2);
+  expect(prompts[0]).toEqual(prompts[1]);
+  expect(answer?.selected).toBe("Request changes");
+
+  const summary = checkpointPresentation(payload);
+  expect(summary.summary).toContain("authorizes test writing and execution");
+  expect(summary.summary).not.toContain("authorizes implementation");
+});
+
+test("complete details retain every event and payload field, including ordered exact argv", () => {
+  const payload = {
+    event: {
+      type: "approve_test_gap",
+      outcomes: ["R7", "R4"],
+      reason: "reason exact",
+      impact: "impact exact",
+      revisit: "trigger exact",
+      candidate: "candidate exact",
+      disposition: { actor: "human", decision: "human:exact" },
+    },
+    contract: {
+      requirements: [{ id: "R7", source: "architect:decision", bounds: "bounds exact" }],
+    },
+    scope: { production: ["src/a.ts"], tests: ["tests/a.test.ts"] },
+    checks: { run: ["bun", "run", "--cwd", "adapter", "typecheck"] },
+    checkpoint: { evidence: "evidence exact", unknownField: { retained: true } },
+  };
+  const details = checkpointPresentation(payload).details;
+  for (const value of [
+    "R7", "R4", "reason exact", "impact exact", "trigger exact",
+    "candidate exact", "human:exact", "architect:decision", "bounds exact",
+    "src/a.ts", "tests/a.test.ts", "bun", "--cwd", "typecheck",
+    "evidence exact", "unknownField", "retained",
+  ]) expect(details).toContain(value);
+  expect(details.indexOf("R7")).toBeLessThan(details.indexOf("R4"));
 });

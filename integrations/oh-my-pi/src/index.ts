@@ -8,7 +8,8 @@ import type { Json, Scope } from "./types.ts";
 
 export default function agad(pi: ExtensionAPI) {
   const provider = process.env.AGAD_OMP_PROVIDER ?? "openai-codex";
-  const controller = new Controller(pi, provider);
+  let refreshPanel = () => {};
+  const controller = new Controller(pi, provider, () => refreshPanel());
   const z = pi.zod;
   const result = (value: unknown) => ({
     content: [
@@ -29,6 +30,24 @@ export default function agad(pi: ExtensionAPI) {
     }
   }
   async function bind(ctx: ExtensionContext) {
+    refreshPanel = () => {
+      if (!ctx.hasUI) return;
+      const { phase, pending, record } = controller.state;
+      const revision = pending?.revision ?? record?.contracts.at(-1)?.revision;
+      ctx.ui.setWidget(
+        "agad",
+        [
+          `AGAD · ${phase}${typeof revision === "number" ? ` · r${revision}` : ""}`,
+          pending
+            ? "Next: /agad-question — answer or consult Decision Partner"
+            : phase === "dialogue"
+              ? "Next: discuss your change with Architect"
+              : "Next: follow Architect guidance · /agad-status",
+        ],
+        { placement: "aboveEditor" },
+      );
+    };
+    if (ctx.hasUI) ctx.ui.setStatus("agad", undefined);
     controller.restore(ctx);
     await controller.checkRecord();
     const model = await resolveModel(ctx, provider, "architect");
@@ -36,10 +55,6 @@ export default function agad(pi: ExtensionAPI) {
       throw new Error("Cannot activate Architect model");
     pi.setThinkingLevel(Effort.High);
     await pi.setActiveTools(architectTools);
-    ctx.ui.setStatus(
-      "agad",
-      `AGAD ${controller.state.phase}${controller.state.pending ? " · question pending" : ""}`,
-    );
   }
   pi.on("session_before_switch", () =>
     controller.busy ? { cancel: true } : undefined,

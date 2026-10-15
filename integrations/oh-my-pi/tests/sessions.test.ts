@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { runSession } from "../src/sessions.ts";
-import { Controller } from "../src/controller.ts";
+import { STATE_ENTRY } from "../src/types.ts";
 function harness(research = false) {
   const options: any[] = [],
     invocations: any[] = [],
@@ -158,4 +158,41 @@ test("Architect status excludes private consultation transcript", () => {
     "Private critique",
   );
   expect(controller.publicState().pending?.id).toBe("q");
+});
+test("controller save and restore refresh the live view from the current branch without private state", () => {
+  const h = harness();
+  const changes: string[] = [];
+  const entries: any[] = [];
+  (h.pi as any).appendEntry = (type: string, data: unknown) => entries.push({ type, data });
+  const controller = new Controller(h.pi, "openai-codex", () =>
+    changes.push(controller.state.phase),
+  );
+  controller.state = {
+    phase: "testing",
+    pending: {
+      id: "question-current",
+      question: "Private question text",
+      options: [{ label: "Approve" }],
+      context: "Private checkpoint payload",
+      consultation: [{ speaker: "partner", text: "Private consultation" }],
+      revision: 4,
+      candidate: "candidate-current",
+    },
+  } as any;
+  controller.save();
+  expect(entries[0].type).toBe(STATE_ENTRY);
+  expect(entries[0].data).toEqual(controller.state);
+  expect(changes).toEqual(["testing"]);
+
+  const branch = [{ type: "custom", customType: STATE_ENTRY, data: entries[0].data }];
+  controller.restore({
+    sessionManager: { getBranch: () => branch },
+  } as any);
+  expect(controller.state).toEqual(entries[0].data);
+  expect(changes.at(-1)).toBe("testing");
+  expect(JSON.stringify(controller.publicState())).not.toContain("Private consultation");
+
+  controller.restore({ sessionManager: { getBranch: () => [] } } as any);
+  expect(controller.state).toEqual({ phase: "dialogue" });
+  expect(changes.at(-1)).toBe("dialogue");
 });

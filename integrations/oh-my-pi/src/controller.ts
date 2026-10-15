@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { append, validate } from "./core.ts";
 import { askPending, isExplicitApproval } from "./dialog.ts";
+import { checkpointPresentation } from "./presentation.ts";
 import { fingerprint, safePath } from "./scope.ts";
 import { runSession } from "./sessions.ts";
 import { readTools } from "./roles.ts";
@@ -37,6 +38,7 @@ export class Controller {
   constructor(
     readonly pi: ExtensionAPI,
     readonly provider: string,
+    readonly onStateChange: () => void = () => {},
   ) {}
   publicState() {
     const { pending, ...state } = this.state;
@@ -55,6 +57,7 @@ export class Controller {
   }
   save() {
     this.pi.appendEntry(STATE_ENTRY, structuredClone(this.state));
+    this.onStateChange();
   }
   restore(ctx: ExtensionContext) {
     this.generation++;
@@ -62,9 +65,11 @@ export class Controller {
     for (const entry of ctx.sessionManager.getBranch())
       if (entry.type === "custom" && entry.customType === STATE_ENTRY)
         this.state = structuredClone(entry.data as AdapterState);
+    this.onStateChange();
   }
   async checkRecord() {
     if (this.state.record) this.state.phase = await validate(this.state.record);
+    this.onStateChange();
   }
   async commit(event: Json) {
     if (!this.state.record) throw new Error("Propose a contract first");
@@ -132,6 +137,7 @@ export class Controller {
       pending,
       {
         ui: ctx.ui,
+        current,
         save: () => {
           current();
           this.save();
@@ -235,23 +241,21 @@ export class Controller {
     }
     await append(this.state.record, proposed);
     await this.freshIfCandidate(ctx, event);
-    const payload = JSON.stringify(
-      {
-        event,
-        contract: this.state.record?.contracts.find(
-          (c: Json) => c.revision === event.revision,
-        ),
-        scope: scope ?? this.state.scope,
-      },
-      null,
-      2,
-    );
+    const payload = {
+      event,
+      contract: this.state.record?.contracts.find(
+        (c: Json) => c.revision === event.revision,
+      ),
+      scope: scope ?? this.state.scope,
+    };
+    const presentation = checkpointPresentation(payload);
     return this.question(
       ctx,
       {
-        question: `${event.type}: approve this exact scope and evidence?`,
+        question: presentation.title,
         options: [{ label: "Approve" }, { label: "Request changes" }],
-        context: payload,
+        context: JSON.stringify(payload, null, 2),
+        presentation,
         event: structuredClone(event),
         revision: event.revision,
         candidate: event.candidate,

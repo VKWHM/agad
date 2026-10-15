@@ -10,6 +10,7 @@ export interface PendingQuestion {
   question: string;
   options: { label: string; description?: string }[];
   context: string;
+  presentation?: import("./presentation.ts").CheckpointPresentation;
   revision?: number;
   candidate?: string;
   event?: Json;

@@ -1,7 +1,7 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-  ToolDefinition,
+  CustomTool,
 } from "@oh-my-pi/pi-coding-agent";
 import {
   assertIdentity,
@@ -33,7 +33,7 @@ export async function runSession(
     selected = profile(role, critical);
   const model = await resolveModel(ctx, provider, role, critical);
   const { createAgentSession, SessionManager, Settings } = pi.pi;
-  const customTools: ToolDefinition[] = [];
+  const customTools: CustomTool[] = [];
   if (role === "decision_partner")
     customTools.push({
       name: "agad_research",
@@ -42,7 +42,7 @@ export async function runSession(
         "Delegate a read-only repository or web research question to a Luna Low Scout. Return sources and uncertainty. No other delegation is available.",
       approval: "read",
       parameters: pi.zod.object({ question: pi.zod.string() }),
-      async execute(_id, args, childSignal) {
+      async execute(_id, args, _onUpdate, _ctx, childSignal) {
         const result = await runSession(pi, ctx, provider, {
           role: "scout",
           prompt: (args as { question: string }).question,
@@ -59,7 +59,7 @@ export async function runSession(
         "Execute one exact developer-approved check ID; cannot supply a command.",
       approval: "exec",
       parameters: pi.zod.object({ id: pi.zod.string() }),
-      async execute(_id, args, childSignal) {
+      async execute(_id, args, _onUpdate, _ctx, childSignal) {
         return {
           content: [
             {

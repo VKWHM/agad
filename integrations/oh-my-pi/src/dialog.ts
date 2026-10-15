@@ -1,9 +1,20 @@
 import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent";
 import type { HumanAnswer, PendingQuestion } from "./types.ts";
+import { pendingPresentation } from "./presentation.ts";
 export interface DialogPort {
   ui: ExtensionUIContext;
   save(): void;
+  current?(): void;
   partner(prompt: string, signal?: AbortSignal): Promise<string>;
+}
+// The host returns labels, not option IDs. Reserve distinct presentation-only
+// action labels without changing any original pending option.
+function actionLabel(base: string, used: Set<string>) {
+  let label = base;
+  for (let suffix = 2; used.has(label); suffix++)
+    label = `${base} (${suffix})`;
+  used.add(label);
+  return label;
 }
 // The native dialog owns the original question. A consultation never resolves it.
 export async function askPending(
@@ -11,16 +22,30 @@ export async function askPending(
   port: DialogPort,
   signal?: AbortSignal,
 ): Promise<HumanAnswer | undefined> {
+  const labels = new Set(pending.options.map((option) => option.label));
+  const chat = actionLabel("Chat about this — Decision Partner", labels);
+  const presentation = pendingPresentation(pending);
+  const review = presentation ? actionLabel("Review full details", labels) : undefined;
+  const question = presentation
+    ? `${presentation.title}\n\n${presentation.summary}`
+    : `${pending.question}\n\n${pending.context}`;
+  const other = actionLabel("Type another answer", labels);
   while (!signal?.aborted) {
+    port.current?.();
     let answer: HumanAnswer | undefined,
-      discuss = false;
+      discuss = false,
+      showDetails = false;
     if (port.ui.askDialog) {
       const result = await port.ui.askDialog(
         [
           {
             id: pending.id,
-            question: `${pending.question}\n\n${pending.context}`,
-            options: pending.options,
+            question,
+            options: [
+              ...pending.options,
+              ...(review ? [{ label: review, description: "Complete original payload; viewing is not approval" }] : []),
+              { label: chat, description: "Private consultation; not an answer or approval" },
+            ],
           },
         ],
         { signal },
@@ -35,33 +60,54 @@ export async function askPending(
           item.timedOut
         )
           return;
+        // A mixed result is not an explicit human choice, even if the text is
+        // blank. Leave the question pending rather than interpreting approval.
+        if (
+          item.selectedOptions.length &&
+          (item.customInput !== undefined || item.customInputImages?.length)
+        )
+          return;
         if (
           item.selectedOptions.length > 1 ||
           item.selectedOptions.some(
-            (s) => !pending.options.some((o) => o.label === s),
+            (s) => s !== chat && s !== review && !pending.options.some((o) => o.label === s),
           )
         )
           throw new Error("Invalid native answer");
-        answer = {
-          selected: item.selectedOptions[0],
-          custom: item.customInput,
-          note: item.note,
-        };
+        if (item.selectedOptions[0] === chat) discuss = true;
+        else if (review && item.selectedOptions[0] === review) showDetails = true;
+        else
+          answer = {
+            selected: item.selectedOptions[0],
+            custom: item.customInput,
+            note: item.note,
+          };
       }
     } else {
       const options = pending.options.map((o) => o.label);
       const selected = await port.ui.select(
-        `${pending.question}\n\n${pending.context}`,
-        [...options, "Discuss with Decision Partner", "Type another answer"],
+        question,
+        [...options, ...(review ? [review] : []), chat, other],
         { signal },
       );
       if (selected === undefined) return;
-      discuss = selected === "Discuss with Decision Partner";
-      if (selected === "Type another answer")
+      discuss = selected === chat;
+      showDetails = !!review && selected === review;
+      if (selected === other)
         answer = {
           custom: await port.ui.input("Your answer", undefined, { signal }),
         };
-      else if (!discuss) answer = { selected };
+      else if (!discuss && !showDetails) {
+        if (!options.includes(selected)) throw new Error("Invalid native answer");
+        answer = { selected };
+      }
+    }
+    port.current?.();
+    if (showDetails && presentation) {
+      // Native scrollable editor is only a display. Its returned text has no authority.
+      await port.ui.editor("Review full details — close to return; not approval", presentation.details, { signal });
+      port.current?.();
+      continue;
     }
     if (!discuss) {
       if (answer?.custom?.trim() || answer?.selected) return answer;
