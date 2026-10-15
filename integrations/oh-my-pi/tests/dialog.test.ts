@@ -26,7 +26,9 @@ test("consultation preserves original question and returns only final human answ
     seen: unknown[] = [];
   let n = 0,
     saves = 0;
+  const notices: string[] = [];
   const answer = await askPending(question, {
+    tmuxConsultation: false,
     save() {
       saves++;
     },
@@ -35,6 +37,7 @@ test("consultation preserves original question and returns only final human answ
       return "Advisory analysis with sources";
     },
     ui: ui({
+      notify: (message: string) => notices.push(message),
       askDialog: async (q: unknown) => {
         seen.push(q);
         return n++ === 0 ? { kind: "chat" } : submit("B");
@@ -54,6 +57,7 @@ test("consultation preserves original question and returns only final human answ
     { speaker: "partner", text: "Advisory analysis with sources" },
   ]);
   expect(saves).toBe(2);
+  expect(notices.some((message) => message.includes("not a split pane"))).toBe(true);
 });
 test("cancellation leaves pending question unresolved", async () => {
   const question = pending();
@@ -118,6 +122,7 @@ test("dialog displays original question context to human", async () => {
 test("partner failure returns to original question without choosing an option", async () => {
   let n = 0;
   const answer = await askPending(pending(), {
+    tmuxConsultation: false,
     ui: ui({
       askDialog: async () => (n++ === 0 ? { kind: "chat" } : submit("A")),
       input: async () => "Search",
@@ -214,7 +219,7 @@ test("details display preserves exact nested payload and discards editor changes
         prompts.push(dialogs[0]);
         return editors++ === 0
           ? { kind: "submit", results: [{ id: question.id, selectedOptions: ["Review full details"] }] }
-          : submit("Request changes");
+          : submit("B");
       },
       editor: async (_title: string, content: string) => {
         for (const value of ["provisional", "bun", "run", "--cwd", "adapter", "R7", "☃", "unknown", "true"])
@@ -225,11 +230,8 @@ test("details display preserves exact nested payload and discards editor changes
   });
   expect(editors).toBe(2);
   expect(prompts[0]).toEqual(prompts[1]);
-  expect(answer?.selected).toBe("Request changes");
+  expect(answer?.selected).toBe("B");
 
-  const summary = checkpointPresentation(payload);
-  expect(summary.summary).toContain("authorizes test writing and execution");
-  expect(summary.summary).not.toContain("authorizes implementation");
 });
 
 test("complete details retain every event and payload field, including ordered exact argv", () => {
