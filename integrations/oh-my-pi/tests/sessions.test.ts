@@ -4,7 +4,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@oh-my-pi/pi-coding-agent";
-import { runSession } from "../src/sessions.ts";
+import { resetWorkerSessions, runSession } from "../src/sessions.ts";
 import { STATE_ENTRY, type AdapterState } from "../src/types.ts";
 import { Controller } from "../src/controller.ts";
 import {
@@ -252,7 +252,7 @@ test("early Test Engineer planning has no write or execution tools", async () =>
     "early scenario planning only",
   );
 });
-test("critical Business Reviewer is exactly Sol High without production writes", async () => {
+test("critical Business Reviewer is exactly Sol High with full native tools", async () => {
   const h = harness();
   await runSession(h.pi, h.ctx, "openai-codex", {
     role: "business_reviewer",
@@ -260,7 +260,7 @@ test("critical Business Reviewer is exactly Sol High without production writes",
     prompt: "Discover scenarios",
   });
   expect(h.sessionOptions[0].thinkingLevel).toBe("high");
-  expect(h.sessionOptions[0].toolNames).not.toContain("write");
+  expect(h.sessionOptions[0].toolNames).toBeUndefined();
 });
 test("missing exact model fails before session execution", async () => {
   const h = harness();
@@ -389,3 +389,131 @@ test("controller save and restore refresh the live view from the current branch 
   expect(controller.state).toEqual({ phase: "dialogue" });
   expect(changes.at(-1)).toBe("dialogue");
 });
+test("Implementer keeps the full native tool set, OMP features, and persistent session reuse across follow-ups", async () => {
+  await resetWorkerSessions();
+  const h = harness();
+  await runSession(h.pi, h.ctx, "openai-codex", {
+    role: "implementer",
+    prompt: "Build it",
+    scope: { production: ["src"], tests: ["tests"], checks: {} },
+  });
+  const options = h.sessionOptions[0];
+  expect(options.agentName).toBe("agad-implementer");
+  expect(options.agentId).toBe("agad-implementer");
+  expect(options.toolNames).toBeUndefined();
+  expect(options.restrictToolNames).toBeUndefined();
+  expect(options.enableIrc).toBe(true);
+  expect(options.enableLsp).toBe(true);
+  expect(options.enableMCP).toBe(true);
+  expect(options.spawns).toBe("*");
+  expect(options.taskDepth).toBe(1);
+  expect(options.appendSystemPrompt).toBeDefined();
+  expect(options.systemPrompt).toBeUndefined();
+  expect(options.model?.id).toBe("gpt-6.1-sol");
+  expect(h.disposed).toHaveLength(0);
+
+  // Follow-up reuses the same live session without creating a new one
+  await runSession(h.pi, h.ctx, "openai-codex", {
+    role: "implementer",
+    prompt: "Incremental refinement",
+    scope: { production: ["src"], tests: ["tests"], checks: {} },
+  });
+  expect(h.sessionOptions).toHaveLength(1);
+  expect(h.invocations).toHaveLength(2);
+  expect(h.invocations[1].prompt).toBe("Incremental refinement");
+
+  // fresh: true disposes the old worker session and spawns a clean one
+  await runSession(h.pi, h.ctx, "openai-codex", {
+    role: "implementer",
+    prompt: "Start over with new design",
+    fresh: true,
+    scope: { production: ["src"], tests: ["tests"], checks: {} },
+  });
+  expect(h.disposed).toEqual(["agad-implementer"]);
+  expect(h.sessionOptions).toHaveLength(2);
+  expect(h.invocations).toHaveLength(3);
+  await resetWorkerSessions();
+});
+
+test("Implementer extension allows child subagent spawning and does not abort child subagents on different models or efforts", async () => {
+  await resetWorkerSessions();
+  const h = harness();
+  const overlaid: Readonly<Record<string, unknown>>[] = [];
+  (h.pi as unknown as { pi: { Settings: Record<string, unknown> } }).pi.Settings.current =
+    Promise.resolve({
+      overlay: (overrides: Readonly<Record<string, unknown>>) => {
+        overlaid.push(overrides);
+        return { ...overrides, overlaid: true };
+      },
+    });
+  await runSession(h.pi, h.ctx, "openai-codex", {
+    role: "implementer",
+    prompt: "Build with subagents",
+    scope: { production: ["src"], tests: ["tests"], checks: {} },
+  });
+  const options = h.sessionOptions[0];
+  expect(overlaid).toEqual([
+    {
+      "retry.enabled": false,
+      "retry.fallbackChains": {},
+    },
+  ]);
+  const handlers = new Map<string, (...args: any[]) => any>();
+  let thinkingLevel = "medium";
+  const extFactory = options.extensions?.[0] as unknown as (api: any) => void;
+  extFactory({
+    on: (event: string, fn: (...args: any[]) => any) => handlers.set(event, fn),
+    getThinkingLevel: () => thinkingLevel,
+  });
+
+  // 1. Subagent spawn is allowed for implementer
+  expect(handlers.get("before_subagent_spawn")?.({})).toBeUndefined();
+
+  // 2. Child subagent (e.g. implementation-worker or scout) inherits preparedExtensions in OMP;
+  //    before_provider_request must NOT abort or reject the child subagent's own model/effort.
+  let childAborted = false;
+  thinkingLevel = "low";
+  expect(() =>
+    handlers.get("before_provider_request")?.(
+      {},
+      {
+        agent: {
+          kind: "subagent",
+          id: "CoreCutover",
+          name: "scout",
+          parentId: "agad-implementer",
+          depth: 2,
+        },
+        model: { provider: "openai-codex", id: "gpt-6-luna" },
+        abort: () => {
+          childAborted = true;
+        },
+      },
+    ),
+  ).not.toThrow();
+  expect(childAborted).toBe(false);
+
+  // 3. The implementer itself IS still strictly guarded against model/effort drift.
+  let implementerAborted = false;
+  expect(() =>
+    handlers.get("before_provider_request")?.(
+      {},
+      {
+        agent: {
+          kind: "subagent",
+          id: "agad-implementer",
+          name: "agad-implementer",
+          parentId: "Main",
+          depth: 1,
+        },
+        model: { provider: "openai-codex", id: "gpt-6-luna" },
+        abort: () => {
+          implementerAborted = true;
+        },
+      },
+    ),
+  ).toThrow("AGAD implementer requires exactly openai-codex/gpt-6.1-sol:medium");
+  expect(implementerAborted).toBe(true);
+  await resetWorkerSessions();
+});
+

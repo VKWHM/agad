@@ -15,7 +15,7 @@ export const profiles = {
   test_engineer: { id: "gpt-6-luna", effort: Effort.High },
   decision_partner: { id: "gpt-6.1-sol", effort: Effort.Medium },
 } as const;
-export const readTools = ["read", "grep", "glob", "web_search"];
+export const readTools = ["read", "grep", "glob", "find", "web_search"];
 export function profile(role: Role, critical = false) {
   return {
     ...profiles[role],
