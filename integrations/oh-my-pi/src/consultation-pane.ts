@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PendingQuestion } from "./types.ts";
+import { pendingPresentation } from "./presentation.ts";
 
 const MAX_FRAME_BYTES = 2 * 1024 * 1024;
 const MAX_PROMPT_BYTES = 32 * 1024;
@@ -19,6 +20,7 @@ const PANE_SCRIPT = fileURLToPath(
 );
 
 export function generateConsultationMarkdown(pending: PendingQuestion): string {
+  const presentation = pendingPresentation(pending);
   const parts: string[] = [
     "# AGAD Decision Partner — Consultation Brief",
     "",
@@ -33,6 +35,9 @@ export function generateConsultationMarkdown(pending: PendingQuestion): string {
     parts.push(
       `- **${option.label}**${option.description ? ` — ${option.description}` : ""}`,
     );
+  }
+  if (presentation) {
+    parts.push("", `## ${presentation.title}`, presentation.summary);
   }
   parts.push("", "## Context", pending.context);
   if (pending.consultation && pending.consultation.length > 0) {
@@ -51,28 +56,52 @@ export function generateConsultationHook(
   socketPath: string,
   pending: PendingQuestion,
 ): string {
+  const presentation = pendingPresentation(pending);
   const optionsText = pending.options
     .map(
       (o) =>
         `- ${safeTerminalText(o.label)}${o.description ? ` — ${safeTerminalText(o.description)}` : ""}`,
     )
-    .join("\\n");
+    .join("\n");
   const turnsText = pending.consultation
     .map(
       (t) =>
-        `\\n${t.speaker === "developer" ? "You" : "Decision Partner"}:\\n${safeTerminalText(t.text)}`,
+        `\n${t.speaker === "developer" ? "You" : "Decision Partner"}:\n${safeTerminalText(t.text)}`,
     )
-    .join("\\n");
+    .join("\n");
+  const summarySection = presentation
+    ? `${safeTerminalText(presentation.title)}:\n${safeTerminalText(presentation.summary)}`
+    : `Context:\n${safeTerminalText(pending.context)}`;
+  const initialSummary = [
+    `Pending question:\n${safeTerminalText(pending.question)}`,
+    `Options:\n${optionsText}`,
+    summarySection,
+    ...(pending.consultation.length
+      ? [`Private consultation transcript:${turnsText}`]
+      : []),
+    "Type /context to view the full consultation context brief.\nType /return to close this pane and return to the unchanged question.",
+  ].join("\n\n");
+  const fullBrief = generateConsultationMarkdown(pending);
 
-  return `import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
+  // The pane is a native OMP session (real model, streaming thinking and tool
+  // activity). This hook only mirrors finished turns back to the host so the
+  // private consultation stays recorded, and relays Scout research requests.
+  return `import { readFile } from "node:fs/promises";
 import { createConnection } from "node:net";
+
+const ALLOWED_TOOLS = ["read", "grep", "glob", "find", "web_search", "agad_research"];
+const INITIAL_SUMMARY = ${JSON.stringify(initialSummary)};
+const FULL_BRIEF = ${JSON.stringify(fullBrief)};
 
 export default function (pi) {
   const socket = createConnection(${JSON.stringify(socketPath)});
   socket.setEncoding("utf8");
-  let replyResolve;
-  let replyReject;
+  const research = new Map();
   let buffer = "";
+  let seq = 0;
+  const send = (message) => {
+    try { socket.write(JSON.stringify(message) + "\\n"); } catch {}
+  };
 
   socket.on("data", (chunk) => {
     buffer += chunk.toString();
@@ -84,96 +113,131 @@ export default function (pi) {
       if (!frame.trim()) continue;
       try {
         const msg = JSON.parse(frame);
-        if (msg.type === "response") {
-          const fn = replyResolve;
-          replyResolve = undefined;
-          replyReject = undefined;
-          fn?.(msg.text);
-        } else if (msg.type === "error") {
-          const fn = replyReject;
-          replyResolve = undefined;
-          replyReject = undefined;
-          fn?.(new Error(msg.text ?? "Consultation error"));
+        if (msg.type === "research_result" || msg.type === "research_error") {
+          const waiter = research.get(msg.id);
+          research.delete(msg.id);
+          if (msg.type === "research_result") waiter?.resolve(msg.text ?? "");
+          else waiter?.reject(new Error(msg.text ?? "Research failed"));
         } else if (msg.type === "aborted") {
           process.exit(0);
         }
       } catch {}
     }
   });
-
   socket.on("close", () => process.exit(0));
   socket.on("error", () => process.exit(0));
-  socket.write(JSON.stringify({ type: "ready" }) + "\\n");
+  send({ type: "ready" });
 
   console.log("AGAD — Decision Partner (advisory only; not an answer or approval)");
   console.log("Pending question:\\n" + ${JSON.stringify(safeTerminalText(pending.question))});
   console.log("\\nOptions:\\n" + ${JSON.stringify(optionsText)});
   console.log("\\nContext:\\n" + ${JSON.stringify(safeTerminalText(pending.context))});
   ${pending.consultation.length ? `console.log("\\nPrivate consultation transcript:" + ${JSON.stringify(turnsText)});` : ""}
-  console.log("\\nType /return to close this pane and return to the unchanged question.");
+  console.log("\\nType /context to view the full consultation context brief.");
+  console.log("Type /return to close this pane and return to the unchanged question.");
+
+  pi.on("session_start", (_event, ctx) => {
+    ctx?.ui?.setWidget?.(
+      "agad-consult",
+      [
+        "AGAD · Decision Partner (advisory only; not an answer or approval)",
+        "Commands: /context (view full brief) · /return (close and return to question)",
+      ],
+      { placement: "aboveEditor" },
+    );
+    pi.sendMessage?.(
+      {
+        customType: "AGAD — Decision Partner (advisory only; not an answer or approval)",
+        content: INITIAL_SUMMARY,
+        display: true,
+      },
+      { triggerTurn: false },
+    );
+  });
+
+  pi.registerCommand("context", {
+    description: "Display the full consultation context brief",
+    handler: async (_args, ctx) => {
+      let briefText = "";
+      const briefPath = process.env.AGAD_CONSULT_BRIEF;
+      if (briefPath) {
+        try {
+          briefText = await readFile(briefPath, "utf8");
+        } catch {}
+      }
+      if (!briefText) briefText = FULL_BRIEF;
+      if (pi.sendMessage && ctx?.hasUI) {
+        pi.sendMessage(
+          {
+            customType: "AGAD Consultation Brief",
+            content: briefText,
+            display: true,
+          },
+          { triggerTurn: false },
+        );
+      } else {
+        console.log("\\n" + briefText + "\\n");
+      }
+    },
+  });
 
   pi.registerCommand("return", {
     description: "Close consultation and return to the unchanged question",
     handler: async () => {
-      try { socket.write(JSON.stringify({ type: "return" }) + "\\n"); } catch {}
+      send({ type: "return" });
       process.exit(0);
     },
   });
 
-  pi.registerProvider("agad-partner", {
-    baseUrl: "http://localhost",
-    apiKey: "dummy",
-    api: "agad-partner-api",
-    models: [
-      {
-        id: "partner",
-        name: "Decision Partner",
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 128000,
-        maxTokens: 4096,
-      },
-    ],
-    streamSimple: (model, context) => {
-      const stream = new AssistantMessageEventStream();
-      const userMsgs = (context.messages || []).filter((m) => m.role === "user");
-      const lastUser = userMsgs[userMsgs.length - 1];
-      let promptText = "";
-      if (typeof lastUser?.content === "string") {
-        promptText = lastUser.content;
-      } else if (Array.isArray(lastUser?.content)) {
-        promptText = lastUser.content
-          .filter((c) => c.type === "text")
-          .map((c) => c.text)
-          .join("\\n");
-      }
-      promptText = promptText.replace(/<system-reminder>[\\s\\S]*?<\\/system-reminder>\\s*/g, "").trim();
-      const pendingReply = new Promise((resolve, reject) => {
-        replyResolve = resolve;
-        replyReject = reject;
-      });
-      socket.write(JSON.stringify({ type: "prompt", text: promptText }) + "\\n");
-      void pendingReply.then(
-        (reply) => {
-          const msg = {
-            role: "assistant",
-            content: [{ type: "text", text: reply }],
-            stopReason: "stop",
-            usage: { inputTokens: 10, outputTokens: 10, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-          };
-          stream.push({ type: "start", partial: msg });
-          stream.push({ type: "text_start", contentIndex: 0, partial: msg });
-          stream.push({ type: "text_delta", contentIndex: 0, delta: reply, partial: msg });
-          stream.push({ type: "text_end", contentIndex: 0, content: reply, partial: msg });
-          stream.push({ type: "done", reason: "stop", message: msg });
-        },
-        (err) => {
-          stream.push({ type: "error", error: err instanceof Error ? err.message : String(err) });
-        },
-      );
-      return stream;
+  pi.registerTool({
+    name: "agad_research",
+    label: "Research Scout",
+    description:
+      "Delegate a read-only repository or web research question to a Luna Low Scout. Returns sources and uncertainty. No other delegation is available.",
+    approval: "read",
+    parameters: pi.zod.object({ question: pi.zod.string() }),
+    async execute(_id, params, signal) {
+      const id = String(++seq);
+      const reply = new Promise((resolve, reject) => research.set(id, { resolve, reject }));
+      signal?.addEventListener("abort", () => {
+        const waiter = research.get(id);
+        research.delete(id);
+        waiter?.reject(new Error("Research aborted"));
+      }, { once: true });
+      send({ type: "research", id, text: params.question });
+      return { content: [{ type: "text", text: await reply }], details: {} };
     },
+  });
+
+  pi.on("before_subagent_spawn", () => ({
+    block: true,
+    reason: "Use only the explicit agad_research delegation path.",
+  }));
+  pi.on("tool_call", (event) => {
+    if (ALLOWED_TOOLS.includes(event.toolName)) return undefined;
+    if (event.toolName === "write") {
+      const path =
+        event.input && typeof event.input === "object" && "path" in event.input
+          ? String(event.input.path ?? "").trim()
+          : "";
+      if (/^xd:\\/\\/agad_research([/?#]|$)/i.test(path)) return undefined;
+    }
+    return { block: true, reason: "Decision Partner is advisory and read-only." };
+  });
+
+  pi.on("input", (event) => {
+    const text = typeof event.text === "string" ? event.text.trim() : "";
+    if (text && !text.startsWith("/")) send({ type: "log_developer", text });
+  });
+  pi.on("agent_end", (event) => {
+    if (event.willContinue) return;
+    const last = [...(event.messages || [])].reverse().find((m) => m.role === "assistant");
+    const text = (Array.isArray(last?.content) ? last.content : [])
+      .filter((c) => c.type === "text")
+      .map((c) => c.text)
+      .join("\\n")
+      .trim();
+    if (text) send({ type: "log_partner", text });
   });
 }
 `;
@@ -182,6 +246,7 @@ export default function (pi) {
 type PaneMessage =
   | { type: "ready" }
   | { type: "prompt"; text: string }
+  | { type: "log"; speaker: "developer" | "partner"; text: string }
   | { type: "return" }
   | { type: "closed" }
   | { type: "aborted" };
@@ -190,6 +255,17 @@ export interface ConsultationPanePort {
   partner(prompt: string, signal?: AbortSignal): Promise<string>;
   save(): void;
   current?(): void;
+  /**
+   * When present (and `omp` is installed) the pane is a native OMP session on
+   * the Decision Partner's exact model, so the Developer sees thinking, file
+   * reads, globs and research activity live. Turns are mirrored back here.
+   */
+  native?: {
+    model: string;
+    thinking: string;
+    systemPrompt(): Promise<string> | string;
+    research(question: string, signal?: AbortSignal): Promise<string>;
+  };
 }
 
 export type PaneResult = { opened: boolean; reason?: string };
@@ -374,6 +450,39 @@ export async function runTmuxConsultation(
             if (message?.type === "ready") enqueue({ type: "ready" });
             else if (message?.type === "return") enqueue({ type: "return" });
             else if (
+              (message?.type === "log_developer" ||
+                message?.type === "log_partner") &&
+              typeof message.text === "string"
+            )
+              enqueue({
+                type: "log",
+                speaker:
+                  message.type === "log_developer" ? "developer" : "partner",
+                text: message.text,
+              });
+            else if (
+              message?.type === "research" &&
+              typeof message.id === "string" &&
+              typeof message.text === "string"
+            ) {
+              const id: string = message.id;
+              void Promise.resolve()
+                .then(() => {
+                  if (!port.native) throw new Error("Research is unavailable");
+                  return port.native.research(message.text, closing.signal);
+                })
+                .then(
+                  (text) =>
+                    send(activeSocket, { type: "research_result", id, text }),
+                  (error: unknown) =>
+                    send(activeSocket, {
+                      type: "research_error",
+                      id,
+                      text:
+                        error instanceof Error ? error.message : String(error),
+                    }),
+                );
+            } else if (
               message?.type === "prompt" &&
               typeof message.text === "string"
             )
@@ -408,29 +517,36 @@ export async function runTmuxConsultation(
     await chmod(hookPath, 0o600);
 
     const ompBin =
-      process.env.AGAD_CONSULT_BACKEND === "script"
+      process.env.AGAD_CONSULT_BACKEND === "script" || !port.native
         ? undefined
         : (Bun.which("omp") ??
           (existsSync("/Users/vkwhm/.local/bin/omp")
             ? "/Users/vkwhm/.local/bin/omp"
             : undefined));
 
-    const runner = ompBin
-      ? [
-          ompBin,
-          "--no-extensions",
-          "--no-prewalk",
-          "--no-title",
-          "--tools",
-          "read,grep,glob",
-          "--hook",
-          hookPath,
-          "--model",
-          "agad-partner/partner",
-          "--append-system-prompt",
-          briefPath,
-        ]
-      : [tmux.runtime, PANE_SCRIPT];
+    let runner: string[];
+    if (ompBin && port.native) {
+      const promptPath = join(directory, "partner-prompt.md");
+      await writeFile(promptPath, await port.native.systemPrompt(), "utf8");
+      await chmod(promptPath, 0o600);
+      runner = [
+        ompBin,
+        "--no-extensions",
+        "--no-prewalk",
+        "--no-title",
+        "--no-session",
+        "--tools",
+        "read,grep,glob,web_search,agad_research",
+        "--hook",
+        hookPath,
+        "--model",
+        port.native.model,
+        "--thinking",
+        port.native.thinking,
+        "--append-system-prompt",
+        promptPath,
+      ];
+    } else runner = [tmux.runtime, PANE_SCRIPT];
 
     const split = await invokeTmux(
       [
@@ -481,6 +597,13 @@ export async function runTmuxConsultation(
       const message = await nextMessage();
       if (signal?.aborted || closed) break;
       if (message.type === "ready") continue;
+      if (message.type === "log") {
+        if (!message.text.trim()) continue;
+        port.current?.();
+        pending.consultation.push({ speaker: message.speaker, text: message.text });
+        port.save();
+        continue;
+      }
       if (
         message.type === "closed" ||
         message.type === "return" ||

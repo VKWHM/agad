@@ -178,3 +178,146 @@ test("consultation pane responds to /context by displaying the brief", async () 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("generateConsultationHook produces valid importable TypeScript and presents consultation brief in TUI session_start and /context", async () => {
+  const { generateConsultationHook } = await import("../src/consultation-pane.ts");
+  const directory = await mkdtemp(join(tmpdir(), "agad-hook-test-"));
+  const socketPath = join(directory, "s");
+  const hookPath = join(directory, "consultation-hook.ts");
+  const receivedFrames: any[] = [];
+  let serverSocket: any;
+  let readyResolve!: () => void;
+  const readyPromise = new Promise<void>((resolve) => {
+    readyResolve = resolve;
+  });
+  const server = createServer((socket) => {
+    serverSocket = socket;
+    socket.setEncoding("utf8");
+    let buf = "";
+    socket.on("data", (chunk) => {
+      buf += chunk;
+      let idx: number;
+      while ((idx = buf.indexOf("\n")) >= 0) {
+        const frame = JSON.parse(buf.slice(0, idx));
+        buf = buf.slice(idx + 1);
+        receivedFrames.push(frame);
+        if (frame.type === "ready") readyResolve();
+        if (frame.type === "research") {
+          socket.write(
+            `${JSON.stringify({ type: "research_result", id: frame.id, text: "Scout findings" })}\n`,
+          );
+        }
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+  try {
+    const hookSource = generateConsultationHook(socketPath, {
+      id: "q-ulid",
+      question: "Approve contract revision 1?",
+      options: [
+        { label: "Approve", description: "Explicitly record this governance event" },
+        { label: "Revise", description: "Send changes back to the Architect" },
+      ],
+      context: JSON.stringify({
+        event: { type: "approve_contract", revision: 1 },
+        contract: {
+          revision: 1,
+          intent: "Enforce ULID public ID invariants",
+          requirements: [{ id: "R1", statement: "Reject UUIDs at boundary", in_scope: true, kind: "invariant" }],
+        },
+        scope: { production: ["src/ids.ts"], tests: ["tests/ids.test.ts"], checks: {} },
+      }),
+      event: { type: "approve_contract", revision: 1 },
+      consultation: [{ speaker: "developer", text: "Check boundary rules" }],
+    });
+    await writeFile(hookPath, hookSource, "utf8");
+    const runner = `
+      import { strict as assert } from "node:assert";
+      const mod = await import(${JSON.stringify(hookPath)});
+      const events = new Map();
+      const commands = new Map();
+      const tools = new Map();
+      const sentMessages = [];
+      const widgets = [];
+      const origLog = console.log;
+      console.log = () => {};
+      try {
+        mod.default({
+          zod: { object: (x) => x, string: () => ({}) },
+          on: (event, fn) => events.set(event, fn),
+          registerCommand: (name, spec) => commands.set(name, spec),
+          registerTool: (tool) => tools.set(tool.name, tool),
+          sendMessage: (message, options) => sentMessages.push({ message, options }),
+        });
+      } finally {
+        console.log = origLog;
+      }
+
+      events.get("session_start")?.(
+        { type: "session_start" },
+        {
+          hasUI: true,
+          ui: {
+            setWidget: (key, lines, options) => widgets.push({ key, lines, options }),
+          },
+        },
+      );
+      assert.equal(widgets.length, 1);
+      assert.equal(widgets[0].key, "agad-consult");
+      assert.equal(sentMessages.length, 1);
+      assert.deepEqual(sentMessages[0].options, { triggerTurn: false });
+      assert.equal(sentMessages[0].message.display, true);
+      assert.ok(sentMessages[0].message.content.includes("Approve contract revision 1?"));
+      assert.ok(sentMessages[0].message.content.includes("Enforce ULID public ID invariants"));
+      assert.ok(sentMessages[0].message.content.includes("Check boundary rules"));
+      assert.ok(!sentMessages[0].message.content.includes("\\\\n"));
+
+      await commands.get("context")?.handler("", { hasUI: true });
+      assert.equal(sentMessages.length, 2);
+      assert.equal(sentMessages[1].message.customType, "AGAD Consultation Brief");
+      assert.ok(sentMessages[1].message.content.includes("# AGAD Decision Partner — Consultation Brief"));
+
+      assert.equal(events.get("tool_call")?.({ toolName: "read", input: { path: "src/ids.ts" } }), undefined);
+      assert.equal(
+        events.get("tool_call")?.({ toolName: "write", input: { path: "xd://agad_research?q=ulid" } }),
+        undefined,
+      );
+      assert.deepEqual(
+        events.get("tool_call")?.({ toolName: "write", input: { path: "src/ids.ts" } }),
+        {
+          block: true,
+          reason: "Decision Partner is advisory and read-only.",
+        },
+      );
+
+      const researchResult = await tools.get("agad_research").execute("1", { question: "Where are IDs parsed?" });
+      assert.equal(researchResult.content[0].text, "Scout findings");
+
+      await commands.get("return")?.handler();
+    `;
+    const child = Bun.spawn([process.execPath, "-e", runner], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const timer = setTimeout(() => child.kill("SIGKILL"), 3000);
+    try {
+      const [stderr, exitCode] = await Promise.all([
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      expect(stderr).toBe("");
+      expect(exitCode).toBe(0);
+      await readyPromise;
+      expect(receivedFrames.map((f) => f.type)).toEqual(["ready", "research", "return"]);
+    } finally {
+      clearTimeout(timer);
+      child.kill("SIGKILL");
+    }
+  } finally {
+    serverSocket?.destroy();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
