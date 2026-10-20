@@ -261,3 +261,22 @@ test("complete details retain every event and payload field, including ordered e
   ]) expect(details).toContain(value);
   expect(details.indexOf("R7")).toBeLessThan(details.indexOf("R4"));
 });
+
+test("contract approval leads with what the Implementer will build and lists outcomes", () => {
+  const { summary } = checkpointPresentation({
+    event: { type: "approve_contract", revision: 1 },
+    contract: {
+      intent: "Export and restore checkout snapshots",
+      requirements: [{ id: "R1", statement: "Restore Pending sessions without replay", kind: "confirmed", in_scope: true }],
+    },
+    scope: { production: ["src/a.ts"], tests: ["tests/a.test.ts"], checks: { test: ["bun", "test"] } },
+  });
+  expect(summary.startsWith("The Implementer will build: Export and restore checkout snapshots")).toBe(true);
+  expect(summary).toContain("R1: Restore Pending sessions without replay");
+  expect(summary).toContain("Files the Implementer may edit (1):");
+  expect(summary.indexOf("R1:")).toBeLessThan(summary.indexOf("Approve authorizes"));
+});
+test("Architect may run shell commands", async () => {
+  const { architectTools } = await import("../src/controller.ts");
+  expect(architectTools).toContain("bash");
+});

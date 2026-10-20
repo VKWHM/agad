@@ -40,41 +40,52 @@ function checkpointSummary(payload: Json): string[] {
 
   switch (event.type) {
     case "approve_contract": {
-      lines.push(
-        "Approve authorizes implementation of the specified contract outcomes within the proposed production/test scope and approved checks; it is not testing authorization or final acceptance.",
-      );
-      if (contract.intent) lines.push(`Intent: ${contract.intent}`);
-      if (contract.rationale && contract.rationale !== contract.intent)
-        lines.push(`Rationale: ${contract.rationale}`);
-      if (contract.change_type || contract.risk) {
-        const parts = [
-          contract.change_type ? `Change type: ${contract.change_type}` : "",
-          contract.risk ? `Risk: ${contract.risk}` : "",
-        ].filter(Boolean);
-        lines.push(parts.join(" | "));
+      // Order matters: the dialog collapses long text, so lead with WHAT will be built.
+      const intent = concise(contract.intent, 400);
+      lines.push(`The Implementer will build: ${intent ?? "(no intent supplied; ask Architect)"}`);
+      const requirements = Array.isArray(contract.requirements) ? (contract.requirements as Json[]) : [];
+      if (requirements.length) {
+        lines.push(
+          `Required outcomes (${requirements.length}):\n` +
+            requirements
+              .map((r) => {
+                const tags = [r.kind, r.in_scope === false ? "out of scope" : ""].filter(Boolean).join(", ");
+                return `  • ${r.id ?? "?"}: ${concise(r.statement, 240) ?? "(no statement)"}${tags ? ` [${tags}]` : ""}`;
+              })
+              .join("\n"),
+        );
       }
-      value("Teach back (intended outcomes)", contract.teach_back ?? contract.intent ?? event.teach_back);
-      if (Array.isArray(scope?.production) && scope.production.length) {
-        const prod = scope.production as string[];
-        const preview = prod.slice(0, 5).map((p) => `  • ${p}`).join("\n");
-        const more = prod.length > 5 ? `\n  ... and ${prod.length - 5} more files` : "";
-        lines.push(`Production scope (${prod.length} files):\n${preview}${more}`);
-      }
-      if (Array.isArray(scope?.tests) && scope.tests.length) {
-        const tests = scope.tests as string[];
-        const preview = tests.slice(0, 5).map((p) => `  • ${p}`).join("\n");
-        const more = tests.length > 5 ? `\n  ... and ${tests.length - 5} more files` : "";
-        lines.push(`Test scope (${tests.length} files):\n${preview}${more}`);
-      }
+      const listFiles = (label: string, files: unknown) => {
+        if (!Array.isArray(files) || !files.length) return;
+        const list = files as string[];
+        const more = list.length > 8 ? `\n  ... and ${list.length - 8} more files` : "";
+        lines.push(`${label} (${list.length}):\n${list.slice(0, 8).map((p) => `  • ${p}`).join("\n")}${more}`);
+      };
+      listFiles("Files the Implementer may edit", scope?.production);
+      listFiles("Files the Test Engineer may edit later", scope?.tests);
       const allChecks = scope?.checks ?? payload?.checks;
       if (allChecks && typeof allChecks === "object" && Object.keys(allChecks).length) {
         lines.push(
-          "Approved checks:\n" +
+          "Checks that must pass:\n" +
             Object.entries(allChecks)
               .map(([id, argv]: [string, any]) => `  • ${id}: ${Array.isArray(argv) ? argv.join(" ") : String(argv)}`)
               .join("\n"),
         );
       }
+      if (Array.isArray(contract.architecture) && contract.architecture.length)
+        lines.push(`Boundaries to respect:\n${(contract.architecture as string[]).map((r) => `  • ${concise(r, 200)}`).join("\n")}`);
+      if (contract.rationale && contract.rationale !== contract.intent)
+        lines.push(`Rationale: ${concise(contract.rationale, 400)}`);
+      if (contract.change_type || contract.risk)
+        lines.push([
+          contract.change_type ? `Change type: ${contract.change_type}` : "",
+          contract.risk ? `Risk: ${contract.risk}` : "",
+        ].filter(Boolean).join(" | "));
+      const teach = contract.teach_back ?? event.teach_back;
+      if (teach && teach !== contract.intent) value("Teach back (intended outcomes)", teach);
+      lines.push(
+        "Approve authorizes implementation of the outcomes above within the listed files and checks; it is not testing authorization or final acceptance.",
+      );
       break;
     }
     case "waive_business_review": {

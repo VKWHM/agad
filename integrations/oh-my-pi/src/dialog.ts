@@ -1,13 +1,14 @@
 import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent";
 import type { HumanAnswer, PendingQuestion } from "./types.ts";
 import { pendingPresentation } from "./presentation.ts";
-import { runTmuxConsultation } from "./consultation-pane.ts";
+import { runTmuxConsultation, type ConsultationPanePort } from "./consultation-pane.ts";
 export interface DialogPort {
   ui: ExtensionUIContext;
   save(): void;
   current?(): void;
   tmuxConsultation?: boolean;
   partner(prompt: string, signal?: AbortSignal): Promise<string>;
+  native?: ConsultationPanePort["native"];
 }
 // The host returns labels, not option IDs. Reserve distinct presentation-only
 // action labels without changing any original pending option.
