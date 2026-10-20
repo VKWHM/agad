@@ -10,6 +10,7 @@ import {
   latestWorkerReferences,
 } from "./worker-history.ts";
 import { parseJsonArg } from "./contract-normalization.ts";
+import { bindEvent, buildEvent } from "./guidance.ts";
 
 export default function agad(pi: ExtensionAPI) {
   const provider = process.env.AGAD_OMP_PROVIDER ?? "openai-codex";
@@ -109,14 +110,54 @@ export default function agad(pi: ExtensionAPI) {
     if (!architectTools.includes(event.toolName))
       return {
         block: true,
-        reason: "Architect is read-only and must use governed AGAD tools.",
+        reason: "Architect may only use read, search, shell, IRC (write agent://<id>) and governed AGAD tools.",
       };
-    if (controller.state.pending && event.toolName !== "agad_status")
-      return {
-        block: true,
-        reason:
-          "A developer question is pending. Resume with /agad-question; no dependent work may continue.",
-      };
+    if (event.toolName === "write") {
+      const path =
+        event.input && typeof event.input === "object" && "path" in event.input
+          ? String(event.input.path ?? "")
+          : "";
+      const trimmed = path.trim();
+      const xdMatch = trimmed.match(/^xd:\/\/([^/?#]+)/i);
+      if (xdMatch) {
+        const targetTool = xdMatch[1].toLowerCase();
+        const allowedXdTools = [
+          ...architectTools,
+          "bash",
+          "sh",
+          "shell",
+          "report_issue",
+          "resolve",
+          "reject",
+          "propose",
+        ];
+        if (!allowedXdTools.includes(targetTool))
+          return {
+            block: true,
+            reason: `Architect cannot invoke '${targetTool}'; Architect may only use read, search, shell, IRC (write agent://<id>) and governed AGAD tools.`,
+          };
+      } else if (!/^(agent|local):\/\//i.test(trimmed)) {
+        return {
+          block: true,
+          reason:
+            "Architect cannot write repository files directly; use `write` only for IRC (`agent://<id>`) or `local://` scratch, and delegate file edits via `agad_delegate`.",
+        };
+      }
+    }
+    if (controller.state.pending) {
+      const isStatusCall =
+        event.toolName === "agad_status" ||
+        (event.toolName === "write" &&
+          /^xd:\/\/agad_status([/?#]|$)/i.test(
+            String((event.input as any)?.path ?? "").trim(),
+          ));
+      if (!isStatusCall)
+        return {
+          block: true,
+          reason:
+            "A developer question is pending. Resume with /agad-question; no dependent work may continue.",
+        };
+    }
   });
   pi.registerTool({
     name: "agad_status",
@@ -215,22 +256,45 @@ export default function agad(pi: ExtensionAPI) {
       "Propose a core human checkpoint event. Actor, decision and statement source are supplied only by the human UI. Supports provisional approval, exact trivial waiver, test gap, acceptance and cancellation.",
     approval: "read",
     parameters: z.object({
-      event_json: z
-        .string()
-        .describe(
-          "Human checkpoint event JSON: { type: 'provisionally_approve' | 'accept' | 'waive_business_review' | 'approve_test_gap' | 'cancel', revision: number, ... }",
-        ),
+      type: z
+        .enum(["provisionally_approve", "accept", "waive_business_review", "approve_test_gap", "cancel"])
+        .describe("Which human checkpoint to put to the Developer"),
+      reason: z.string().optional().describe("waive_business_review, approve_test_gap, cancel"),
+      dispositions: z
+        .record(
+          z.string(),
+          z.object({
+            action: z.enum(["resolved", "excluded", "accepted_risk"]),
+            reason: z.string(),
+            evidence: z.string().optional().describe("required when action=resolved"),
+            revisit: z.string().optional().describe("required when action is excluded or accepted_risk"),
+          }),
+        )
+        .optional()
+        .describe("provisionally_approve: one entry per review finding ID; omit or {} if the review had no findings"),
+      code_review: z.string().optional().describe("accept: what the Developer reviewed"),
+      no_business_change: z.boolean().optional().describe("waive_business_review: must be true"),
+      no_architecture_change: z.boolean().optional().describe("waive_business_review: must be true"),
+      outcomes: z.array(z.string()).optional().describe("approve_test_gap: non-invariant outcome IDs"),
+      impact: z.string().optional().describe("approve_test_gap"),
+      revisit: z.string().optional().describe("approve_test_gap: revisit trigger"),
     }),
     async execute(_id, args, signal, _update, ctx) {
-      return exclusive(async () =>
-        result(
-          await controller.checkpoint(
-            ctx,
-            parseJsonArg((args as any).event_json, "event_json"),
-            signal,
-          ),
-        ),
-      );
+      return exclusive(async () => {
+        const input = args as Json;
+        try {
+          const event = buildEvent(input, [
+            "provisionally_approve",
+            "accept",
+            "waive_business_review",
+            "approve_test_gap",
+            "cancel",
+          ]);
+          return result(await controller.checkpoint(ctx, event, signal));
+        } catch (error) {
+          throw controller.explain(error, input.type);
+        }
+      });
     },
   });
   pi.registerTool({
@@ -258,7 +322,7 @@ export default function agad(pi: ExtensionAPI) {
     name: "agad_delegate",
     label: "Delegate governed task",
     description:
-      "Run scout, implementer, business_reviewer or test_engineer on the exact assigned model/effort. Core gates, approved write scopes, candidate fingerprints and required checks are enforced.",
+      "Run scout, implementer, business_reviewer or test_engineer on the exact assigned model/effort. Core gates, candidate fingerprints and required checks are enforced. Phase gates: implementer needs 'authorized'; business_reviewer 'implemented'; test_engineer 'test_authorized'. Implementer, Business Reviewer and Test Engineer sessions stay alive across follow-up calls (registered as `agad-implementer`, `agad-business-reviewer`, `agad-test-engineer` on OMP IRC); pass `fresh: true` only when you want to discard the existing worker session and spawn a clean one.",
     approval: "exec",
     parameters: z.object({
       role: z.enum([
@@ -267,51 +331,72 @@ export default function agad(pi: ExtensionAPI) {
         "business_reviewer",
         "test_engineer",
       ]),
-      task: z.string(),
+      task: z
+        .string()
+        .describe("What to do/examine, with relevant outcome IDs. Do not restate JSON format."),
+      fresh: z
+        .boolean()
+        .optional()
+        .describe("Set true only to discard the kept-alive worker session for this role and spawn a clean session."),
     }),
     async execute(_id, args, signal, _update, ctx) {
-      return exclusive(async () =>
-        result(
-          await controller.delegate(
-            ctx,
-            (args as { role: Role }).role,
-            (args as { task: string }).task,
-            signal,
-          ),
-        ),
-      );
+      return exclusive(async () => {
+        const { role, task, fresh } = args as {
+          role: Role;
+          task: string;
+          fresh?: boolean;
+        };
+        try {
+          return result(
+            await controller.delegate(ctx, role, task, signal, fresh === true),
+          );
+        } catch (error) {
+          throw controller.explain(error, undefined, role);
+        }
+      });
     },
   });
   pi.registerTool({
     name: "agad_event",
     label: "Record Architect coordination",
     description:
-      "Record only an Architect control event: revise, request_repair, request_test_correction, block, resume. Never supplies human or worker reports.",
+      "Record only an Architect control event: revise, request_repair, request_test_correction, block, resume. Never supplies human or worker reports. The host binds revision and candidate. Pass typed fields directly (no JSON string). Rejections explain the fix: correct it, do not resend unchanged.",
     approval: "read",
     parameters: z.object({
-      event_json: z
+      type: z.enum(["revise", "request_repair", "request_test_correction", "block", "resume"]),
+      reason: z.string().describe("Why this event is recorded"),
+      changes_business_semantics: z
+        .boolean()
+        .optional()
+        .describe("request_repair/request_test_correction: must be false; business changes use revise"),
+      outcomes: z
+        .array(z.string())
+        .optional()
+        .describe("request_repair/request_test_correction: nonempty approved in-scope outcome IDs, e.g. ['R1']"),
+      evidence: z
         .string()
-        .describe(
-          "Architect control event JSON: { type: 'revise' | 'request_repair' | 'request_test_correction' | 'block' | 'resume', reason: string, ... }",
-        ),
+        .optional()
+        .describe("request_repair/request_test_correction: concrete defect or stale-candidate evidence"),
+      owner: z.string().optional().describe("block: who unblocks"),
+      next_action: z.string().optional().describe("block: what happens next"),
     }),
     async execute(_id, args) {
       return exclusive(async () => {
-        const event: Json = parseJsonArg(
-          (args as { event_json: string }).event_json,
-          "event_json",
-        );
-        if (
-          ![
+        const input = args as Json;
+        try {
+          const event = buildEvent(input, [
             "revise",
             "request_repair",
             "request_test_correction",
             "block",
             "resume",
-          ].includes(event.type)
-        )
-          throw new Error("Not an Architect control event");
-        await controller.commit({ ...event, actor: "architect" });
+          ]);
+          await controller.commit(
+            bindEvent({ ...event, actor: "architect" }, controller.facts()),
+          );
+        } catch (error) {
+          throw controller.explain(error, input.type);
+        }
         return result({ phase: controller.state.phase });
       });
     },

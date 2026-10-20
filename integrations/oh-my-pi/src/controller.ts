@@ -4,8 +4,9 @@ import { askPending, isExplicitApproval } from "./dialog.ts";
 import { checkpointPresentation } from "./presentation.ts";
 import { fingerprint, safePath } from "./scope.ts";
 import { runSession } from "./sessions.ts";
-import { markdownBrief } from "./prompts.ts";
-import { readTools } from "./roles.ts";
+import { markdownBrief, rolePrompt } from "./prompts.ts";
+import { generateConsultationMarkdown } from "./consultation-pane.ts";
+import { profile, readTools } from "./roles.ts";
 import type { Role } from "./roles.ts";
 import {
   STATE_ENTRY,
@@ -15,6 +16,14 @@ import {
   type Scope,
 } from "./types.ts";
 import { normalizeContract, normalizeScope } from "./contract-normalization.ts";
+import {
+  bindEvent,
+  explainRejection,
+  extractJsonObject,
+  normalizeReport,
+  reportSkeletons,
+  type HostFacts,
+} from "./guidance.ts";
 const humanTypes = new Set([
   "approve_contract",
   "waive_business_review",
@@ -25,6 +34,10 @@ const humanTypes = new Set([
 ]);
 export const architectTools = [
   ...readTools,
+  "bash",
+  "sh",
+  "write",
+  "wait",
   "agad_contract",
   "agad_question",
   "agad_checkpoint",
@@ -82,6 +95,46 @@ export class Controller {
     this.state.record = next.record;
     this.state.phase = next.phase;
     this.save();
+  }
+  /** Facts the host already owns, used to bind events instead of trusting model-typed values. */
+  facts(): HostFacts {
+    const events: Json[] = this.state.record?.events ?? [];
+    const approved = events.findLast((e) => e.type === "approve_contract");
+    const candidate = events.findLast((e) => e.type === "submit_implementation");
+    const review = events.findLast((e) => e.type === "submit_business_review");
+    return {
+      revision: approved?.revision,
+      candidate: candidate?.candidate,
+      findingCount: review?.findings?.length,
+      verification: this.state.verification,
+    };
+  }
+  explain(error: unknown, type?: string, role?: string) {
+    const approved = this.facts().revision;
+    const outcomes = this.state.record?.contracts
+      .find((c: Json) => c.revision === approved)
+      ?.requirements.filter((r: Json) => r.in_scope)
+      .map((r: Json) => r.id);
+    return explainRejection(error, { phase: this.state.phase, type, role, outcomes });
+  }
+  // Validate a would-be report event without mutating the record.
+  async dryRunReport(role: Role, report: Json, contract: Json, candidate?: string, checks?: Json[]) {
+    const type = { implementer: "submit_implementation", business_reviewer: "submit_business_review", test_engineer: "submit_tests" }[role as string];
+    if (!type || !this.state.record) return;
+    const event: Json = {
+      ...report,
+      type,
+      actor: role,
+      revision: contract.revision,
+      candidate: candidate ?? (role === "implementer" ? "sha256:dry-run" : this.candidate()),
+    };
+    if (role === "test_engineer")
+      Object.assign(event, {
+        checks: checks ?? [],
+        delivery: `omp:delivery:${crypto.randomUUID()}`,
+        report: `omp:report:${crypto.randomUUID()}`,
+      });
+    await append(this.state.record, event);
   }
   current() {
     if (!this.state.record) throw new Error("No approved contract");
@@ -143,6 +196,18 @@ export class Controller {
         save: () => {
           current();
           this.save();
+        },
+        native: {
+          model: `${this.provider}/${profile("decision_partner").id}`,
+          thinking: profile("decision_partner").effort,
+          systemPrompt: async () =>
+            `${await rolePrompt("decision_partner")}\n\n${generateConsultationMarkdown(pending)}`,
+          research: (question, childSignal) =>
+            runSession(this.pi, ctx, this.provider, {
+              role: "scout",
+              signal: childSignal,
+              prompt: question,
+            }),
         },
         partner: async (prompt, childSignal) =>
           runSession(this.pi, ctx, this.provider, {
@@ -238,10 +303,14 @@ export class Controller {
   }
   async checkpoint(
     ctx: ExtensionContext,
-    event: Json,
+    rawEvent: Json,
     signal?: AbortSignal,
     scope?: Scope,
   ) {
+    const event =
+      rawEvent.type === "approve_contract"
+        ? rawEvent
+        : bindEvent(rawEvent, this.facts());
     if (event.type === "approve_contract" && !scope)
       throw new Error("Use agad_contract for a scope-bound contract approval");
     if (!humanTypes.has(event.type))
@@ -395,6 +464,7 @@ export class Controller {
     role: Role,
     task: string,
     signal?: AbortSignal,
+    fresh = false,
   ) {
     if (this.state.pending)
       throw new Error(
@@ -488,20 +558,43 @@ export class Controller {
     const instruction =
       role === "scout"
         ? "Return concise Markdown with findings, source paths/URLs and explicit uncertainty. Do not invent business decisions."
-        : "Return only one JSON object with the role report event fields required by the AGAD core. Do not set actor, revision or candidate; host binds them.";
-    const output = await runSession(this.pi, ctx, this.provider, {
-      role,
-      critical: contract?.risk === "critical",
-      signal,
-      scope: this.state.scope,
-      runCheck,
-      // Preserve the working Test Engineer's input and output contract.
-      prompt: role === "test_engineer"
+        : `Return only one JSON object (no prose, no code fence) shaped like ${reportSkeletons[role]}. "evidence" must be a non-empty string. Do not set actor, revision, candidate, type, checks, delivery or report; host binds them.`;
+    const run = (prompt: string, spawnFresh = false) =>
+      runSession(this.pi, ctx, this.provider, {
+        role,
+        critical: contract?.risk === "critical",
+        signal,
+        scope: this.state.scope,
+        fresh: spawnFresh,
+        runCheck,
+        prompt,
+      });
+    // Preserve the working Test Engineer's input and output contract.
+    const basePrompt =
+      role === "test_engineer"
         ? JSON.stringify({ task, ...context, instruction })
-        : markdownBrief(task, context, instruction),
-    });
+        : markdownBrief(task, context, instruction);
+    let output = await run(basePrompt, fresh);
     if (role === "scout") return output;
-    const report: Json = JSON.parse(output);
+    const parse = (raw: string) => normalizeReport(extractJsonObject(raw));
+    let report: Json;
+    try {
+      report = parse(output);
+      // Dry-run the report on the same live worker session so a fixable shape
+      // or missing-outcomes error is corrected in one turn without losing work.
+      await this.dryRunReport(role, report, contract, undefined, checkResults);
+    } catch (first) {
+      const reason = first instanceof Error ? first.message : String(first);
+      output = await run(
+        markdownBrief(
+          task,
+          { "Your previous reply": output.slice(0, 4000), "Why it was rejected": reason },
+          `Return ONLY one corrected JSON object, shaped like ${reportSkeletons[role]}. Keep your completed work and include all required in-scope outcome IDs; do not repeat unrelated analysis.`,
+        ),
+        false,
+      );
+      report = parse(output);
+    }
     const verifiedTests =
       role === "test_engineer"
         ? await fingerprint(ctx.cwd, this.state.scope!.tests)

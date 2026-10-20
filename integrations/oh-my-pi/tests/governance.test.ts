@@ -8,6 +8,7 @@ import { profiles, profile, assertIdentity } from "../src/roles.ts";
 import { allowWrite, fingerprint } from "../src/scope.ts";
 import { Controller } from "../src/controller.ts";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
+import agad from "../src/index.ts";
 const source = await Bun.file(
   new URL("../../../examples/accepted.json", import.meta.url),
 ).json();
@@ -381,5 +382,88 @@ test("cancelPending clears pending question and unblocks state", () => {
   expect(cancelled?.id).toBe("q-1");
   expect(controller.state.pending).toBeUndefined();
   expect(entries.length).toBe(1);
+});
+
+test("architect tool guard permits xd:// dispatches for architect tools, agent IRC and local scratch, rejecting direct repo writes", async () => {
+  const handlers = new Map<string, Function>();
+  const { z } = await import("zod");
+  const pi = {
+    on: (event: string, handler: Function) => handlers.set(event, handler),
+    getThinkingLevel: () => "high",
+    registerTool: () => {},
+    registerCommand: () => {},
+    zod: z,
+    appendEntry: () => {},
+  } as unknown as ExtensionAPI;
+
+  agad(pi);
+  const toolCallHandler = handlers.get("tool_call")!;
+  expect(toolCallHandler).toBeDefined();
+
+  const ctx = {
+    model: { provider: "openai-codex", id: "gpt-6.1-sol" },
+  };
+
+  // xd://agad_question is permitted
+  expect(
+    toolCallHandler(
+      { toolName: "write", input: { path: "xd://agad_question", content: "{}" } },
+      ctx,
+    ),
+  ).toBeUndefined();
+
+  // xd://bash is permitted
+  expect(
+    toolCallHandler(
+      { toolName: "write", input: { path: "xd://bash", content: "{\"command\": \"ls\"}" } },
+      ctx,
+    ),
+  ).toBeUndefined();
+
+  // xd://agad_status is permitted
+  expect(
+    toolCallHandler(
+      { toolName: "write", input: { path: "xd://agad_status", content: "{}" } },
+      ctx,
+    ),
+  ).toBeUndefined();
+
+  // direct file write is blocked
+  expect(
+    toolCallHandler(
+      { toolName: "write", input: { path: "src/index.ts", content: "hello" } },
+      ctx,
+    ),
+  ).toEqual({
+    block: true,
+    reason:
+      "Architect cannot write repository files directly; use `write` only for IRC (`agent://<id>`) or `local://` scratch, and delegate file edits via `agad_delegate`.",
+  });
+
+  // xd://edit (unauthorized tool for architect) is blocked
+  expect(
+    toolCallHandler(
+      { toolName: "write", input: { path: "xd://edit", content: "{}" } },
+      ctx,
+    ),
+  ).toEqual({
+    block: true,
+    reason:
+      "Architect cannot invoke 'edit'; Architect may only use read, search, shell, IRC (write agent://<id>) and governed AGAD tools.",
+  });
+
+  // agent:// and local:// writes are permitted
+  expect(
+    toolCallHandler(
+      { toolName: "write", input: { path: "agent://agad-implementer", content: "hi" } },
+      ctx,
+    ),
+  ).toBeUndefined();
+  expect(
+    toolCallHandler(
+      { toolName: "write", input: { path: "local://scratch/test.txt", content: "hi" } },
+      ctx,
+    ),
+  ).toBeUndefined();
 });
 
