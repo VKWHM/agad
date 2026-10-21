@@ -1,0 +1,8 @@
+# AGAD Profile for Codex CLI (~/.codex/agad.config.toml)
+# Layered when running: codex -p agad
+
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+
+# Points to the AGAD Architect instructions
+model_instructions_file = "/Users/vkwhm/Documents/agad/integrations/codex/AGENTS.md"

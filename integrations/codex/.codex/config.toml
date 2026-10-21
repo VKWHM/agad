@@ -1,0 +1,8 @@
+# AGAD Codex Configuration
+# Recommended configuration for Architecture-Governed Agentic Development with Codex CLI
+
+# Use high reasoning by default for architectural dialogue and contract design
+model_reasoning_effort = "high"
+
+[features]
+multi_agent = true
