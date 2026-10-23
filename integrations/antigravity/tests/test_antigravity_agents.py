@@ -8,10 +8,10 @@ BASE = pathlib.Path(__file__).resolve().parents[1]
 AGENTS = BASE / "agents"
 EXPECTED = {
     "agad-architect": ("inherit", True, False),
-    "agad-implementer": ("flash", False, True),
-    "agad-business-reviewer": ("flash", False, True),
-    "agad-test-engineer": ("flash", False, True),
-    "agad-scout": ("flash", False, True),
+    "agad-implementer": ("flash", True, True),
+    "agad-business-reviewer": ("flash", True, True),
+    "agad-test-engineer": ("flash", True, True),
+    "agad-scout": ("flash", True, True),
     "agad-decision-partner": ("inherit", False, True),
 }
 

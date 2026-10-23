@@ -2,7 +2,7 @@
 name: agad-implementer
 description: Implements approved AGAD outcomes using the smallest complete correct change.
 model: flash
-mainAgent: false
+mainAgent: true
 subagent: true
 commandExecutionPolicy: sandbox
 tools:

@@ -2,7 +2,7 @@
 name: agad-scout
 description: Fast read-only repository investigator providing grounded evidence to the AGAD Architect.
 model: flash
-mainAgent: false
+mainAgent: true
 subagent: true
 commandExecutionPolicy: sandbox
 tools:

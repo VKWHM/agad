@@ -2,7 +2,7 @@
 name: agad-business-reviewer
 description: Independent scenario-first business review of an approved AGAD candidate; not a code reviewer.
 model: flash
-mainAgent: false
+mainAgent: true
 subagent: true
 commandExecutionPolicy: sandbox
 tools:

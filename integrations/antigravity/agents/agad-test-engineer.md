@@ -2,7 +2,7 @@
 name: agad-test-engineer
 description: Independent AGAD test planning and execution after explicit provisional Developer approval.
 model: flash
-mainAgent: false
+mainAgent: true
 subagent: true
 commandExecutionPolicy: sandbox
 tools:
