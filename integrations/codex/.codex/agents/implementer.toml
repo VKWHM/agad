@@ -36,8 +36,7 @@ Your mission is to build the approved contract outcomes in production code with 
    - Production files created, updated, or removed.
    - Local verification commands executed and their output status.
    - Any delegated implementation choices made and their rationale.
-   - Meaningful work avoided and remaining risks, if any; never claim checks that were not run.
-
+   
 5. **Surface Ambiguities**:
    - If you encounter unexpected domain contradictions, missing business rules, or a required change to approved scope or architecture, stop and report to Architect rather than inventing authority.
 """
