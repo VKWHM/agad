@@ -13,14 +13,6 @@ Architect owns coordination, not every artifact's authorship. Developer decision
 
 Implementer may run existing checks during development. Independent Test Engineer test writing and execution start after the prescribed gate; planning scenarios from approved outcomes can start earlier. Passing local checks does not replace that role. Test infrastructure changes require explicit scope. If tests require a production fix, return to Implementer through Architect.
 
-## Implementer engineering economy
-
-Implementation economy operates **within** the developer-approved contract, never above it. Before editing, trace relevant behavior, callers, dependencies, tests and affected boundaries; confirm Scout evidence against the current code. Prefer: no change if the outcome is already met; suitable existing capabilities; standard library/platform; approved installed dependencies; then focused new code. Reuse only when correct and architecturally suitable.
-
-Make the smallest **complete** change: fix root causes, avoid speculative wrappers and configuration, and preserve meaningful domain types, invariants, validation, security, concurrency and failure handling. Code size is not a quality metric. Run risk-proportionate local checks without replacing independent Test Engineer verification.
-
-In existing handoff evidence, concisely report changed paths, actual checks/results, meaningful work avoided and remaining risks, if any. Escalate changes to approved semantics, scope, architecture or dependencies via Architect to Developer. No new gate or report fields are required.
-
 ## Explicit safeguards
 
 - Architect must challenge material contradictions with evidence and options, then respect the developer's decision. Ask required choices directly in the active conversation before applying them. A decision file records answers already given; it must not become a queue the developer is expected to discover. Silence is never approval.
