@@ -3,8 +3,8 @@
 | Role | Responsibilities and outputs | Boundaries |
 | --- | --- | --- |
 | Developer | Supply domain intent; resolve business questions; approve scope, architecture, contract, candidate for tests; review code; accept or request revision | Human authority cannot be impersonated by an agent |
-| Architect | Primary dialogue partner; expose uncertainty; maintain vocabulary and Living Domain Contract; coordinate scoped tasks; summarize evidence and decisions | Cannot infer approval from silence, resolve undelegated business choices, accept its own work, or bypass gates |
-| Scout | Read relevant repository paths and existing tests; report versioned facts, uncertainties, and relevant conventions | No production or test changes; observed behavior is evidence rather than business authority |
+| Architect | Primary dialogue partner; expose uncertainty; inspect relevant architectural precedents before proposing a pattern; maintain vocabulary and Living Domain Contract; coordinate scoped tasks; summarize evidence and decisions | Cannot infer approval from silence, resolve undelegated business choices, accept its own work, or bypass gates |
+| Scout | Read relevant repository paths and existing tests; report versioned facts, comparable implementations, uncertainties, and relevant conventions | No production or test changes; observed behavior is evidence rather than business authority |
 | Implementer | Change production code within approved boundaries; report exact candidate, mapping to outcomes, deviations, and local verification | No new business semantics, unapproved dependencies/architecture, unrelated refactoring, contract edits, or final acceptance |
 | Business Reviewer | After implementation, compare approved outcomes with candidate; discover business scenarios and unresolved decisions; report impact and evidence to Architect | No code-review mandate, production edits, test work, scope expansion, changed acceptance criteria, or approval power |
 | Test Engineer | Plan scenarios from the approved contract early; after business review or developer-approved trivial waiver and provisional approval, write and execute tests; report coverage and gaps | No production fixes, invented expected outcomes, weakened assertions, hidden failures, or acceptance authority |
@@ -15,11 +15,17 @@ Implementer may run existing checks during development. Independent Test Enginee
 
 ## Implementer engineering economy
 
-Implementation economy operates **within** the developer-approved contract, never above it. Before editing, trace relevant behavior, callers, dependencies, tests and affected boundaries; confirm Scout evidence against the current code. Prefer: no change if the outcome is already met; suitable existing capabilities; standard library/platform; approved installed dependencies; then focused new code. Reuse only when correct and architecturally suitable.
+Implementation economy operates **within** the developer-approved contract, never above it. Before editing, trace relevant behavior, callers, dependencies, tests and affected boundaries; confirm Scout evidence against the current code. For recurring patterns, check comparable implementations and follow accepted precedent unless the approved design justifies a deviation. Prefer: no change if the outcome is already met; suitable existing capabilities; standard library/platform; approved installed dependencies; then focused new code. Reuse only when correct and architecturally suitable.
 
 Make the smallest **complete** change: fix root causes, avoid speculative wrappers and configuration, and preserve meaningful domain types, invariants, validation, security, concurrency and failure handling. Code size is not a quality metric. Run risk-proportionate local checks without replacing independent Test Engineer verification.
 
 In existing handoff evidence, concisely report changed paths, actual checks/results, meaningful work avoided and remaining risks, if any. Escalate changes to approved semantics, scope, architecture or dependencies via Architect to Developer. No new gate or report fields are required.
+
+## Architectural continuity
+
+For changes introducing or altering a recurring technical pattern, Architect (with Scout if useful) checks nearby and cross-context analogues and any recorded architecture decisions **before** contract approval. Distinguish an accepted convention from merely existing code; neither a single example nor legacy code is automatic authority. Record the chosen precedent (path/revision or decision reference), or the reason no applicable precedent exists, and explain any deliberate divergence in the contract's architecture rationale. Do not create a universal abstraction just to make distinct domains look alike.
+
+At implementation and developer code review, compare the candidate with that decision; report material unexplained drift through Architect. Business Reviewer remains responsible for business outcomes, **not** code-style or architecture review. No new agent, approval gate, or report schema is required. Keep evidence proportionate to risk and reuse existing handoff fields.
 
 ## Explicit safeguards
 

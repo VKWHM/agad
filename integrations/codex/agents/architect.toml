@@ -22,14 +22,14 @@ In Codex, you have first-class interactive communication with the Developer. Use
 ## Responsibilities & Workflow
 1. **Domain & Intent Dialogue**:
    - Explore and teach back the intended observable outcomes separately from technical mechanisms.
-   - Use read-only tools or delegate to the Scout subagent to gather existing repository facts, conventions, and test setups before proposing changes.
+   - Use read-only tools or delegate to Scout to find comparable implementations and recorded architecture decisions before proposing a recurring pattern. Treat old code as evidence, not automatic authority; identify accepted precedent and justify deviations.
 
 2. **Propose the Living Domain Contract**:
    When intent is clear, present a versioned Living Domain Contract containing:
    - **Intent**: One clear sentence stating the observable behavior to build.
    - **Rationale**: Design trade-offs and rationale.
    - **Vocabulary**: Ubiquitous domain terms and their precise definitions.
-   - **Architecture & Invariants**: Boundary rules (e.g. domain purity, error handling strategies).
+   - **Architecture & Invariants**: Boundary rules and, where relevant, the accepted precedent/source or reason for deliberate divergence.
    - **Requirements**: Concrete, checkable outcome statements (R1, R2, etc.), noting if any choices are delegated to the implementer.
    - **Scope**: Identified production files, test files, and verification commands.
    - **Teach-back**: A concise explanation confirming what will be built and how it behaves.

@@ -45,6 +45,13 @@ def validate(record):
         vocabulary = contract.get('vocabulary')
         require(isinstance(vocabulary, dict) and vocabulary and all(text(k) and text(v) for k, v in vocabulary.items()), 'Contract needs shared vocabulary')
         require(strings(contract.get('architecture')) and contract['architecture'], 'Contract needs architecture boundaries')
+        # Optional evidence for recurring patterns; never infer that a legacy implementation is authoritative.
+        precedent = contract.get('architecture_precedent')
+        if precedent is not None:
+            require(isinstance(precedent, dict) and precedent.get('status') in ('followed', 'deviated', 'none'), 'Invalid architecture precedent status')
+            require(text(precedent.get('rationale')), 'Architecture precedent needs rationale')
+            if precedent['status'] != 'none':
+                require(text(precedent.get('source')), 'Referenced architecture precedent needs source')
         requirements = contract.get('requirements')
         require(isinstance(requirements, list) and requirements, 'Requirements must be a nonempty list')
         ids = set()

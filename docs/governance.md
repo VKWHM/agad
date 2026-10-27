@@ -18,6 +18,7 @@
 | G14 | Test gaps need real scoped developer decisions; invariant checks are not optional | Prior gap approval bound to candidate/revision; mandatory checks cannot be waived in a report |
 | G15 | Technical repairs do not reopen settled business decisions | Architect repair path retains revision, binds defect to approved outcomes and restarts downstream gates |
 | G16 | Test corrections preserve approved semantics and unchanged production | Architect correction path requires new delivery/report; no reuse of stale passing evidence |
+| G17 | Recurring architectural patterns consider existing accepted precedents before new design; divergences have explicit rationale | Optional structured precedent evidence is shape-checked in reference records; evaluating architectural equivalence requires human review |
 
 `tools/validate.py` replays one independently scoped change. The accepted JSON is fictional and is not evidence of real developer approval. The checker does not execute agents or production commands.
 

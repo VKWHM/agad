@@ -9,7 +9,7 @@
 - Risk and why (trivial / routine / standard / critical):
 - Change type: technical | business
 - Architect teach-back of intended observable behavior, separate from recommended mechanism:
-- Architecture boundaries / allowed changes:
+- Architecture boundaries / allowed changes (for recurring patterns: accepted precedent + source, or no applicable precedent; justify deviations):
 - Invariants (stable IDs linked to required outcome checks):
 - Mandatory verification checks and rationale:
 

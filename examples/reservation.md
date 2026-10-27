@@ -4,6 +4,8 @@ This fictional example demonstrates process, not a recommended business policy.
 
 The Developer requests cancellation of a draft reservation. Architect asks what “draft” means and whether sent reservations can be cancelled. Developer confirms draft cancellation, excludes sent reservations from this change, and asks the Architect to preserve their verified existing behavior. No separate approval is needed for each existing convention.
 
+Architect inspects the existing reservation lifecycle and records it as the relevant architectural precedent, without assuming that every historical implementation is authoritative. No new abstraction or competing lifecycle API is needed. The compact machine-readable example records this evidence as an optional `architecture_precedent` annotation; the checker verifies its structure, not the repository facts.
+
 Contract reservation-cancel revision 1 defines R1: cancelling a draft transitions it to cancelled. R2: attempts on sent reservations preserve the existing rejection. The developer approves revision 1. Implementer submits candidate production-A.
 
 Business Reviewer finds F1: cancelling an already-cancelled reservation has unspecified semantics. It reports a newly discovered scenario, not a requirement violation. Architect presents the question. Developer chooses idempotent success, producing R3 and revision 2. Revision 1 authorization no longer applies.
