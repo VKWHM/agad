@@ -38,6 +38,11 @@
       "architecture": [
         "Keep cancellation within existing reservation lifecycle boundary"
       ],
+      "architecture_precedent": {
+        "status": "followed",
+        "source": "repo:snapshot-0:reservation-lifecycle",
+        "rationale": "Use the established lifecycle instead of introducing a second cancellation mechanism"
+      },
       "invariant_ids": [
         "R1",
         "R3"
