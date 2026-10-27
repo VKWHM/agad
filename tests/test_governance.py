@@ -17,6 +17,17 @@ class GovernanceTests(unittest.TestCase):
         with self.assertRaises(GovernanceError):
             validate(self.record)
 
+    def test_architecture_precedent_evidence(self):
+        self.assertEqual(validate(self.record), 'accepted')
+        self.record['contracts'][0]['architecture_precedent']['source'] = ''
+        self.rejected()
+        self.record['contracts'][0]['architecture_precedent'] = {'status': 'deviated', 'source': 'repo:example', 'rationale': ''}
+        self.rejected()
+        self.record['contracts'][0]['architecture_precedent'] = {'status': 'none', 'rationale': 'No comparable implementation found'}
+        self.assertEqual(validate(self.record), 'accepted')
+        del self.record['contracts'][0]['architecture_precedent']
+        self.assertEqual(validate(self.record), 'accepted')
+
     def test_complete_flow(self):
         self.assertEqual(validate(self.record), 'accepted')
 
