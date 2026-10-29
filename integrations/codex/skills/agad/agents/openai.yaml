@@ -1,0 +1,4 @@
+interface:
+  display_name: "AGAD"
+  short_description: "Architecture-governed multi-agent workflow"
+  default_prompt: "Use $agad to coordinate feature development with the Architect, living domain contracts, and specialized subagents."

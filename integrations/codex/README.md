@@ -31,9 +31,38 @@ AGAD defines clear roles that collaborate seamlessly through Codex's native suba
 
 ---
 
-## 3. Quickstart
+## 3. Bundled Codex Plugin & Skills
 
-### Option A: Use in this repository
+AGAD is packaged as a standard **Codex Plugin** with native skills, subagent definitions, and local marketplace support:
+
+- **Manifests**: `.codex-plugin/plugin.json` and root `plugin.json` following the portable Agent Plugins standard.
+- **Marketplace**: `.agents/plugins/marketplace.json` enabling installation via `codex plugin marketplace add` and `codex plugin add`.
+- **Skills**:
+  - `$agad`: Master AGAD workflow coordinator skill for architecture-governed feature development.
+  - `$agad-contract`: Drafts, refines, and validates Living Domain Contracts (intent, rationale, vocabulary, invariants, requirements, scope).
+  - `$agad-review`: Conducts independent business reviews (derives domain scenarios and edge cases before code inspection).
+  - `$agad-test`: Designs and runs automated verification against approved outcomes without compromising assertions.
+- **Subagents**: Native Codex subagents (`@architect`, `@implementer`, `@business-reviewer`, `@test-engineer`, `@scout`, `@decision-partner`).
+
+---
+
+## 4. Quickstart & Installation Options
+
+### Option A: Install as a Native Codex Plugin (Recommended)
+You can install the bundled AGAD plugin directly into your local Codex environment:
+
+```sh
+# One-liner with the setup script:
+./scripts/install.sh plugin
+
+# Or manually using native Codex CLI commands:
+codex plugin marketplace add /path/to/agad/integrations/codex
+codex plugin add agad@agad
+```
+
+Once installed, AGAD skills (`$agad`, `$agad-contract`, `$agad-review`, `$agad-test`) are immediately recognized and available across your Codex sessions!
+
+### Option B: Use in this repository
 Codex automatically loads `.codex/agents/` and `AGENTS.md` when launched in this directory:
 
 ```sh
@@ -41,30 +70,31 @@ cd integrations/codex
 codex
 ```
 
-### Option B: Install into an existing project
-Run the included setup script to configure AGAD in your project:
+### Option C: Install into an existing project
+Run the setup script to copy AGAD subagents and configuration to a specific project:
 
 ```sh
-# Set up in current project root:
+# Set up in target project root:
 ./scripts/install.sh project /path/to/your/project
 
-# Or install globally for all Codex sessions:
+# Or install agents globally into ~/.codex/agents:
 ./scripts/install.sh global
-
-# Or set up a dedicated AGAD profile:
-./scripts/install.sh profile
 ```
 
-Then simply open your project in Codex:
+### Option D: Dedicated AGAD Profile (`codex -p agad`)
+To run Codex with the Architect persona as the primary model:
 
 ```sh
-cd /path/to/your/project
-codex
+./scripts/install.sh profile
+```
+Then start Codex with:
+```sh
+codex -p agad
 ```
 
 ---
 
-## 4. Separating AGAD Features vs Everyday Non-AGAD Tasks
+## 5. Separating AGAD Features vs Everyday Non-AGAD Tasks
 
 You don't always want the full AGAD process (e.g. when asking simple questions, debugging a quick script, or doing casual refactoring). You can separate these workflows easily using either of these approaches:
 
@@ -89,7 +119,7 @@ If you prefer opening Codex directly into AGAD mode without typing `@architect`:
 
 ---
 
-## 4. The Collaborative Workflow
+## 6. The Collaborative Workflow
 
 ```mermaid
 flowchart TD
@@ -135,7 +165,7 @@ The Developer conducts human code review of the candidate diff and test results,
 
 ---
 
-## 5. Comparison: Codex vs Oh My Pi (OMP) Integration
+## 7. Comparison: Codex vs Oh My Pi (OMP) Integration
 
 | Dimension | Oh My Pi (`integrations/oh-my-pi`) | Codex (`integrations/codex`) |
 | :--- | :--- | :--- |

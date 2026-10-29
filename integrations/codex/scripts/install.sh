@@ -2,14 +2,21 @@
 set -euo pipefail
 
 # AGAD Codex Setup Script
-# Installs or links AGAD agents and configuration for Codex CLI
+# Installs AGAD as a native Codex plugin, project agents, global agents, or profile
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODEX_INTEGRATION_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-TARGET="${1:-project}"
+TARGET="${1:-plugin}"
 
-if [ "${TARGET}" = "global" ]; then
+if [ "${TARGET}" = "plugin" ]; then
+    echo "Registering AGAD local marketplace with Codex..."
+    codex plugin marketplace add "${CODEX_INTEGRATION_DIR}"
+    echo "Installing AGAD plugin into Codex..."
+    codex plugin add agad@agad
+    echo "Done! AGAD plugin is installed and enabled in Codex."
+    echo "You can now use AGAD skills ($agad, $agad-contract, $agad-review, $agad-test) and subagents in Codex."
+elif [ "${TARGET}" = "global" ]; then
     DEST_DIR="${HOME}/.codex/agents"
     echo "Installing AGAD agents globally to ${DEST_DIR}..."
     mkdir -p "${DEST_DIR}"
@@ -41,6 +48,6 @@ elif [ "${TARGET}" = "project" ]; then
     fi
     echo "Done! AGAD is configured for project at ${PROJECT_ROOT}."
 else
-    echo "Usage: $0 [project <path> | global | profile]"
+    echo "Usage: $0 [plugin | project <path> | global | profile]"
     exit 1
 fi

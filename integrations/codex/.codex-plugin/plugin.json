@@ -1,0 +1,41 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "agad",
+  "version": "0.1.0",
+  "description": "Architecture-Governed Agentic Development (AGAD) for Codex: collaborative domain modeling, living contracts, and specialized subagent roles.",
+  "author": {
+    "name": "AGAD Contributors",
+    "url": "https://github.com/vkwhm/agad"
+  },
+  "homepage": "https://github.com/vkwhm/agad",
+  "license": "Apache-2.0",
+  "keywords": [
+    "agad",
+    "architecture",
+    "domain-driven-design",
+    "governance",
+    "living-contract",
+    "subagents",
+    "skills"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AGAD",
+    "shortDescription": "Architecture-governed multi-agent development with living domain contracts",
+    "longDescription": "Architecture-Governed Agentic Development (AGAD) is a developer-centered operating model for collaborating with AI coding agents. The developer owns business meaning and final acceptance, while the Architect develops shared understanding through dialogue, living domain contracts, and specialized subagents (Implementer, Business Reviewer, Test Engineer, Scout).",
+    "developerName": "AGAD Contributors",
+    "category": "Engineering",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/vkwhm/agad",
+    "defaultPrompt": [
+      "Use $agad to start an architecture-governed feature development session",
+      "Draft a Living Domain Contract for our service with $agad-contract",
+      "Perform an independent business review of the current implementation with $agad-review"
+    ],
+    "brandColor": "#2563EB"
+  }
+}

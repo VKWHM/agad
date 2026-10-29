@@ -1,0 +1,4 @@
+interface:
+  display_name: "AGAD Test"
+  short_description: "Automated verification of approved outcomes"
+  default_prompt: "Use $agad-test to write and run targeted automated tests verifying the approved contract requirements."

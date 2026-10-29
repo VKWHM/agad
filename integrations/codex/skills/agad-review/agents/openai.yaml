@@ -1,0 +1,4 @@
+interface:
+  display_name: "AGAD Review"
+  short_description: "Evaluate domain scenarios and invariants"
+  default_prompt: "Use $agad-review to analyze this feature against business scenarios, edge cases, and domain invariants."

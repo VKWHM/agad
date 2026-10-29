@@ -1,0 +1,4 @@
+interface:
+  display_name: "AGAD Contract"
+  short_description: "Draft and validate Living Domain Contracts"
+  default_prompt: "Use $agad-contract to define domain vocabulary, architecture invariants, and verifiable requirements for this feature."
