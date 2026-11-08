@@ -494,12 +494,14 @@ export class Controller {
       const contract = this.current();
       const candidate = this.candidate();
       const generation = this.generation;
-      await this.fresh(ctx);
+      if (this.activeDocumentation)
+        throw new Error("Documentation Steward is already running");
       this.activeDocumentation++;
       try {
-      const before = await fingerprint(ctx.cwd, documentation);
-      const report = await runSession(this.pi, ctx, this.provider, {
-        role, signal, scope: this.state.scope, fresh,
+        await this.fresh(ctx);
+        const before = await fingerprint(ctx.cwd, documentation);
+        const report = await runSession(this.pi, ctx, this.provider, {
+          role, signal, scope: this.state.scope, fresh,
         prompt: markdownBrief(task, {
           "Approved contract": contract,
           "Resolved business review": this.state.record?.events.filter((e: Json) =>
@@ -509,12 +511,12 @@ export class Controller {
           "Approved documentation paths": documentation,
         }, "Audit existing documentation first. Edit only authorized Markdown paths; return concise evidence, changes or no change, and gaps."),
       });
-      if (generation !== this.generation || this.current().revision !== contract.revision || this.candidate() !== candidate)
-        throw new Error("Candidate or session changed during documentation work");
-      await this.fresh(ctx);
-      const after = await fingerprint(ctx.cwd, documentation);
-      return JSON.stringify({ role, revision: contract.revision, candidate,
-        documentation_before: before, documentation_after: after, report });
+        if (generation !== this.generation || this.current().revision !== contract.revision || this.candidate() !== candidate)
+          throw new Error("Candidate or session changed during documentation work");
+        await this.fresh(ctx);
+        const after = await fingerprint(ctx.cwd, documentation);
+        return JSON.stringify({ role, revision: contract.revision, candidate,
+          documentation_before: before, documentation_after: after, report });
       } finally {
         this.activeDocumentation--;
       }
