@@ -100,6 +100,11 @@ test("candidate fingerprint detects source changes but not test edits", async ()
   await writeFile(join(cwd, "src", "domain.ts"), "after");
   expect(await fingerprint(cwd, ["src"])).not.toBe(before);
 });
+test("final approval refuses an in-flight documentation worker", async () => {
+  const controller = new Controller({} as ExtensionAPI, "openai-codex");
+  controller.activeDocumentation = 1;
+  await expect(controller.freshIfCandidate({} as ExtensionContext, { type: "accept" })).rejects.toThrow("still running");
+});
 test("documentation scope stays explicit, Markdown-only and disjoint", async () => {
   const cwd = await workspace();
   await mkdir(join(cwd, "docs"));

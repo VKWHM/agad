@@ -49,6 +49,7 @@ export const architectTools = [
 export class Controller {
   state: AdapterState = { phase: "dialogue" };
   busy = false;
+  activeDocumentation = 0;
   generation = 0;
   constructor(
     readonly pi: ExtensionAPI,
@@ -291,6 +292,8 @@ export class Controller {
         throw new Error("Checkpoint refers to stale candidate");
     }
     if (event.type === "accept") {
+      if (this.activeDocumentation)
+        throw new Error("Documentation work is still running; review its report before acceptance");
       if (
         !this.state.verification ||
         (await fingerprint(ctx.cwd, this.state.scope!.tests)) !==
@@ -492,6 +495,8 @@ export class Controller {
       const candidate = this.candidate();
       const generation = this.generation;
       await this.fresh(ctx);
+      this.activeDocumentation++;
+      try {
       const before = await fingerprint(ctx.cwd, documentation);
       const report = await runSession(this.pi, ctx, this.provider, {
         role, signal, scope: this.state.scope, fresh,
@@ -510,6 +515,9 @@ export class Controller {
       const after = await fingerprint(ctx.cwd, documentation);
       return JSON.stringify({ role, revision: contract.revision, candidate,
         documentation_before: before, documentation_after: after, report });
+      } finally {
+        this.activeDocumentation--;
+      }
     }
     const expected =
       role === "implementer"

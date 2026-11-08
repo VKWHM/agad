@@ -63,13 +63,13 @@ export default function agad(pi: ExtensionAPI) {
     await pi.setActiveTools(architectTools);
   }
   pi.on("session_before_switch", () =>
-    controller.busy ? { cancel: true } : undefined,
+    controller.busy || controller.activeDocumentation ? { cancel: true } : undefined,
   );
   pi.on("session_before_branch", () =>
-    controller.busy ? { cancel: true } : undefined,
+    controller.busy || controller.activeDocumentation ? { cancel: true } : undefined,
   );
   pi.on("session_before_tree", () =>
-    controller.busy ? { cancel: true } : undefined,
+    controller.busy || controller.activeDocumentation ? { cancel: true } : undefined,
   );
   pi.on("session_start", async (_event, ctx) => {
     await bind(ctx);
