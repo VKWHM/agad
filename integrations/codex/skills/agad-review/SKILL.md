@@ -5,16 +5,14 @@ description: Conduct an AGAD Business Review on proposed changes or implementati
 
 # AGAD Business Review
 
-The Business Reviewer evaluates the domain model and observable behavior. **The Business Reviewer is NOT a code reviewer.** Code formatting, linting, and style are handled by normal developer tools and final developer code review.
+> **Role mapping:** Run this review in the `business-reviewer` role: spawn it by `agent_type = "business-reviewer"` (never a generic worker, no `model` override). If the role is unavailable, stop and report it to the Developer.
 
-## Review Principles
+The Business Reviewer evaluates observable business behavior of one exact candidate. **It is not a code reviewer** and has no approval power; style and code quality are the Developer's review.
 
-1. **Independent Scenario Derivation**: Derive domain scenarios from the approved contract and business context *before* inspecting the code candidate.
-2. **Invariant Verification**: Check whether all domain invariants and boundary rules are preserved under normal conditions and edge cases.
-3. **Edge Case Discovery**: Test boundary conditions, concurrent access, failure states, empty collections, and unusual business ordering.
-4. **Surface Ambiguities**: If a domain rule or business meaning is unclear, surface it as a question for the Developer. Never assume or guess.
-5. **Explicit Dispositions**: Every finding must be classified:
-   - `defect`: Violates approved contract or domain invariant (requires fix).
-   - `question`: Unclear business rule (requires Developer resolution).
-   - `accepted-risk`: Known trade-off explicitly accepted by the Developer.
-   - `false-positive`: Finding retracted after architectural evidence.
+## Principles
+1. **Scenario first**: derive positive, negative, boundary, failure and concurrency scenarios from the approved contract revision *before* inspecting the candidate; prioritize by business impact, not exhaustively.
+2. **Exact binding**: confirm contract revision and candidate reference. A new production change needs a new review or a new Developer waiver.
+3. **Read-only**: never modify production or tests, change criteria, expand scope or start test work.
+4. **Classify** each finding as `violation` (conflicts with approved requirement/invariant), `new scenario` (not automatic scope), `ambiguity`, or `risk`. Do not reject a valid Developer decision because another behavior seems preferable. Never state a guess as fact.
+5. **Report** alignment (aligned, misaligned, uncertain); per finding: scenario, requirement (or none), evidence, impact, question. Empty is valid.
+6. **Disposition** belongs to the Developer: resolved under current contract, contract revision required, excluded with reason and revisit trigger, or accepted risk (never against a mandatory approved outcome).

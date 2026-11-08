@@ -24,7 +24,7 @@ class CodexAgentsConfigTests(unittest.TestCase):
             "architect": ("gpt-6.1-sol", "high"),
             "implementer": ("gpt-6.1-sol", "medium"),
             "business-reviewer": ("gpt-6.1-sol", "medium"),
-            "test-engineer": ("gpt-6-luna", "high"),
+            "test-engineer": ("gpt-6.1-terra", "high"),
             "scout": ("gpt-6-luna", "low"),
             "decision-partner": ("gpt-6.1-sol", "high"),
         }
@@ -104,6 +104,32 @@ class CodexAgentsConfigTests(unittest.TestCase):
             self.assertIn("interface:", yaml_content)
             self.assertIn("display_name:", yaml_content)
             self.assertIn("default_prompt:", yaml_content)
+
+    def test_architect_spawns_named_roles_without_model_override(self):
+        with open(os.path.join(self.agents_dir, "architect.toml"), "rb") as fp:
+            text = tomllib.load(fp)["developer_instructions"]
+        self.assertIn("agent_type", text)
+        self.assertIn("Never spawn a generic/default worker", text)
+        self.assertIn("never pass a `model`", text)
+
+    def test_skills_enforce_role_mapping(self):
+        with open(os.path.join(self.skills_dir, "agad", "SKILL.md"), encoding="utf-8") as f:
+            text = f.read()
+        for role in ("scout", "implementer", "business-reviewer", "test-engineer", "decision-partner"):
+            self.assertIn(f"`{role}`", text)
+        self.assertIn("agent_type", text)
+        self.assertIn("Never spawn a generic/default worker", text)
+        self.assertIn("never pass a `model`", text)
+        self.assertIn("stop and report", text)
+        for name in ("agad-contract", "agad-review", "agad-test"):
+            with open(os.path.join(self.skills_dir, name, "SKILL.md"), encoding="utf-8") as f:
+                self.assertIn("Role mapping", f.read(), name)
+
+    def test_plugin_install_installs_role_agents(self):
+        with open(os.path.join(self.base_dir, "scripts", "install.sh"), encoding="utf-8") as f:
+            text = f.read()
+        plugin_branch = text.split('"global"')[0]
+        self.assertIn(".codex/agents", plugin_branch)
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,7 +14,13 @@ if [ "${TARGET}" = "plugin" ]; then
     codex plugin marketplace add "${CODEX_INTEGRATION_DIR}"
     echo "Installing AGAD plugin into Codex..."
     codex plugin add agad@agad
-    echo "Done! AGAD plugin is installed and enabled in Codex."
+    # Plugins ship skills only; the role agents must be installed separately so
+    # that agent_type = "implementer" etc. resolve in every project.
+    DEST_DIR="${HOME}/.codex/agents"
+    echo "Installing AGAD role agents to ${DEST_DIR}..."
+    mkdir -p "${DEST_DIR}"
+    cp -v "${CODEX_INTEGRATION_DIR}/agents/"*.toml "${DEST_DIR}/"
+    echo "Done! AGAD plugin and role agents are installed in Codex."
     echo "You can now use AGAD skills ($agad, $agad-contract, $agad-review, $agad-test) and subagents in Codex."
 elif [ "${TARGET}" = "global" ]; then
     DEST_DIR="${HOME}/.codex/agents"

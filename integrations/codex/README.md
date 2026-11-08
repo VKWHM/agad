@@ -4,30 +4,29 @@ An integration of **Architecture-Governed Agentic Development (AGAD)** designed 
 
 ---
 
-## 1. Philosophy: Relaxed Agent, Wide Instructions, Human Ownership
+## 1. Philosophy: Human Authority, Explicit Gates, Honest Limits
 
-Unlike traditional rigid agent harnesses that attempt to control the model via thousands of lines of interceptor middleware, candidate fingerprinting, tool stripping, and forced single-line JSON replies, **AGAD for Codex** embraces a relaxed, human-centered operating model:
+1. **The Developer owns business meaning, architectural approval, code review and final acceptance.** Only an explicit, attributable Developer statement approves a contract revision, review waiver, provisional testing, test gap or acceptance. Silence, sandbox/approval prompts, agent messages and passing checks are not approval.
+2. **The Architect develops shared understanding through dialogue** and asks the Developer directly about business and architectural gaps. Unknown meaning stays unknown.
+3. **The gate order is mandatory:** contract approval → implementation → business review or Developer waiver → finding dispositions → provisional approval → tests → code review and acceptance. Early test *planning* is allowed; test writing/execution is not.
+4. **Freshness:** revisions are immutable; any production change invalidates review, provisional approval and test evidence. Technical repairs, test-only corrections and revisions each have a defined path.
+5. **Native sandbox where Codex offers it:** Architect, Business Reviewer, Scout and Decision Partner run with `sandbox_mode = "read-only"`; Implementer and Test Engineer run with `workspace-write`.
 
-1. **The Developer owns business meaning and final acceptance.**
-2. **The Architect develops shared understanding through dialogue.**
-3. **The Major AGAD Feature is Interactive Asking:** Codex natively supports conversational dialogue and interactive questions with the developer. Whenever business rules, domain terms, or trade-offs are ambiguous, the agent asks directly.
-4. **Wide, Unrestricted Agent Instructions:** Subagents (Implementer, Business Reviewer, Test Engineer, Scout) operate with clear, comprehensive instructions and have full access to native tools (shell, editing, writing, testing, search).
-5. **No Synthetic State Guards:** No complex state-machine enforcement code or candidate hash trackers are needed. If the instructions are clear, the agent follows them.
+### What this integration does and does not enforce
+Instructions and sandbox modes define and limit each role. This integration ships **no runtime state machine**, so it does **not** restrict which workspace paths the Implementer or Test Engineer write, does not authenticate approvals, and cannot verify candidate freshness. Those obligations bind each role's instructions and the Architect's coordination, and rely on the Developer to refuse out-of-order work. For machine-checked transitions see the [Oh My Pi integration](../oh-my-pi/README.md) and the [reference validator](../../tools/validate.py).
 
 ---
 
 ## 2. Specialized Roles
 
-AGAD defines clear roles that collaborate seamlessly through Codex's native subagent system (`.codex/agents/*.toml`):
-
-| Role | Agent Config | Model ID | Effort | Focus & Responsibilities |
-| :--- | :--- | :--- | :--- | :--- |
-| **Architect** | `architect.toml` | `gpt-6.1-sol` | `high` | Primary dialogue partner of the Developer. Asks clarifying questions, establishes domain vocabulary, proposes the Living Domain Contract, and coordinates the workflow. |
-| **Implementer** | `implementer.toml` | `gpt-6.1-sol` | `medium` | Implements approved contract outcomes in production code. Full access to native tools (shell, edit, write, test). Reports clear, human-readable summaries without rigid schemas. |
-| **Business Reviewer** | `business-reviewer.toml` | `gpt-6.1-sol` | `medium` | Evaluates domain scenarios, edge cases, and invariant violations *before* inspecting implementation. Ensures business alignment. Not a code-style reviewer. |
-| **Test Engineer** | `test-engineer.toml` | `gpt-6-luna` | `high` | Designs and runs automated verification suites against approved contract outcomes. Reports genuine execution results and defects without weakening assertions. |
-| **Scout** | `scout.toml` | `gpt-6-luna` | `low` | Fast, read-only codebase explorer for discovering conventions, existing test setups, and references. |
-| **Decision Partner** | `decision-partner.toml` | `gpt-6.1-sol` | `high` | Advisory brainstorming partner for exploring architectural trade-offs and domain modeling decisions. |
+| Role | Agent Config | Model ID | Effort | Sandbox | Focus |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Architect** | `architect.toml` | `gpt-6.1-sol` | `high` | `read-only` | Dialogue, contract, coordination, delegation briefs. |
+| **Implementer** | `implementer.toml` | `gpt-6.1-sol` | `medium` | `workspace-write` | Approved outcomes in approved production paths; local verification. |
+| **Business Reviewer** | `business-reviewer.toml` | `gpt-6.1-sol` | `medium` | `read-only` | Scenario-first business review; not code review. |
+| **Test Engineer** | `test-engineer.toml` | `gpt-6.1-terra` | `high` | `workspace-write` | Independent tests in approved test paths after the gate. |
+| **Scout** | `scout.toml` | `gpt-6-luna` | `low` | `read-only` | Read-only evidence. |
+| **Decision Partner** | `decision-partner.toml` | `gpt-6.1-sol` | `high` | `read-only` | Advisory only. |
 
 ---
 
@@ -59,6 +58,8 @@ You can install the bundled AGAD plugin directly into your local Codex environme
 codex plugin marketplace add /path/to/agad/integrations/codex
 codex plugin add agad@agad
 ```
+
+The plugin manifest ships skills only, so `install.sh plugin` also copies the six role agents to `~/.codex/agents/`. Without them `$agad` cannot spawn the named roles and must stop rather than substitute a generic worker.
 
 Once installed, AGAD skills (`$agad`, `$agad-contract`, `$agad-review`, `$agad-test`) are immediately recognized and available across your Codex sessions!
 
@@ -123,14 +124,17 @@ If you prefer opening Codex directly into AGAD mode without typing `@architect`:
 
 ```mermaid
 flowchart TD
-  D[Developer ↔ Architect: Domain dialogue & questions] --> C[Developer approves Living Domain Contract]
-  C --> I[Implementer: Production candidate & local checks]
-  I --> B[Business Reviewer: Domain scenarios & edge cases]
-  B --> A[Architect & Developer: Resolve findings]
-  A -->|Provisional Approval| T[Test Engineer: Automated verification]
-  T -->|Defects| I
-  T --> R[Developer: Final code review & acceptance]
-  R --> F[Accepted]
+  D[Developer ↔ Architect: intent and domain dialogue] --> C[Developer approves versioned contract]
+  C --> I[Implementer: production candidate]
+  I --> B[Business review or Developer-approved trivial waiver]
+  B --> A[Architect ↔ Developer: resolve findings]
+  A -->|Revision| D
+  A -->|Provisional approval of exact candidate| T[Test Engineer: approved outcomes]
+  T -->|Technical defect, unchanged contract| I
+  T -->|Unresolved business semantics| D
+  T --> R[Developer: code review and final acceptance]
+  R -->|Changes requested| D
+  R -->|Accept| F[Accepted]
 ```
 
 ### Step 1: Dialogue & Intent Clarification
@@ -147,21 +151,21 @@ The Architect proposes a versioned contract:
 - **Requirements**: Concrete, checkable outcomes (`R1`, `R2`, ...).
 - **Scope**: Disjoint production paths, test paths, and test commands.
 
-The Developer reviews and provides explicit conversational approval.
+The Developer approves the exact revision explicitly. A meaningful change later means a new revision and fresh approval.
 
 ### Step 3: Implementation
 The `implementer` agent builds the approved outcomes:
-- Full access to shell, editor, file tools, and local tests.
+- Edits only approved production paths; may run shell commands and local tests.
 - Summarizes files changed, checks run, and outcomes satisfied in natural Markdown.
 
 ### Step 4: Business Review
-The `business-reviewer` explores real-world domain scenarios and checks for edge cases or potential invariant violations. It reports alignment and surfaces any business questions back to the Architect and Developer.
+The `business-reviewer` explores real-world domain scenarios and checks for edge cases or potential invariant violations. It reports alignment and surfaces business questions to the Architect and Developer. The Developer may instead waive review for one candidate of a trivial technical change. Every finding needs a Developer disposition.
 
 ### Step 5: Provisional Approval & Testing
-With the Developer's provisional approval, the `test-engineer` writes and executes targeted automated tests covering the approved outcomes, reporting genuine command outputs.
+After review (or waiver) and the Developer's explicit provisional approval of the exact candidate, the `test-engineer` writes and executes targeted automated tests covering the approved outcomes, reporting genuine command outputs.
 
 ### Step 6: Code Review & Acceptance
-The Developer conducts human code review of the candidate diff and test results, granting final acceptance.
+The Developer conducts human code review of the actual diff and test results and may accept or request changes. Any production change after approval makes the candidate stale and repeats review, provisional approval and tests.
 
 ---
 
@@ -169,8 +173,8 @@ The Developer conducts human code review of the candidate diff and test results,
 
 | Dimension | Oh My Pi (`integrations/oh-my-pi`) | Codex (`integrations/codex`) |
 | :--- | :--- | :--- |
-| **Enforcement Style** | Programmatic runtime guards & state validation (`controller.ts`, `validate.py`) | Clear instructions & relaxed, trusted agent execution |
+| **Enforcement Style** | Programmatic runtime guards & state validation (`controller.ts`, `validate.py`) | Full gate instructions per role plus native sandbox modes; no runtime state check |
 | **Asking Questions** | Custom UI dialogs, tmux split-pane helper, `/agad-question` commands | Native Codex interactive conversational dialogue |
-| **Tool Restrictions** | Strict tool allowlists per role, tool stripping | Full native tools; guided by role instructions |
+| **Tool Restrictions** | Strict tool allowlists per role, tool stripping | Per-role `sandbox_mode`; path scopes are instruction-only |
 | **Output Formats** | Rigid single-line JSON reply shapes (no prose, no fences) | Natural, expressive, human-readable Markdown |
-| **Code Footprint** | ~3,500 lines of custom TypeScript & bridge scripts | Zero runtime overhead; declarative TOML agent definitions & Markdown instructions |
+| **Code Footprint** | ~3,500 lines of custom TypeScript & bridge scripts | No runtime code; declarative TOML agent definitions & Markdown instructions |
