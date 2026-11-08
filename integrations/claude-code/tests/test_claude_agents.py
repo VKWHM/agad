@@ -60,12 +60,13 @@ class ClaudeAgentsConfigTests(unittest.TestCase):
             "implementer": ("claude-sonnet-5-5", "medium"),
             "business-reviewer": ("claude-sonnet-5-5", "high"),
             "test-engineer": ("claude-haiku-5-5", "high"),
+            "documentation-steward": ("claude-haiku-5-5", "high"),
             "scout": ("claude-haiku-5-5", "low"),
             "decision-partner": ("claude-opus-5-5", "high"),
         }
         found_roles = set()
         files = glob.glob(os.path.join(self.agents_dir, "*.md"))
-        self.assertEqual(len(files), 6, "Expected exactly 6 agent markdown files")
+        self.assertEqual(len(files), 7, "Expected exactly 7 agent markdown files")
 
         for f in files:
             fm, body = self._parse_frontmatter(f)

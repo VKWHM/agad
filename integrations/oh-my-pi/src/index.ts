@@ -342,30 +342,20 @@ export default function agad(pi: ExtensionAPI) {
     }),
     async execute(_id, args, signal, _update, ctx) {
       const { role, task, fresh } = args as {
-          role: Role;
-          task: string;
-          fresh?: boolean;
-        };
-      // Documentation is an independent advisory worker: it may run while
-      // the Test Engineer is using the core's exclusive transition path.
-      if (role === "documentation_steward") {
-        try { return result(await controller.delegate(ctx, role, task, signal, fresh === true)); }
-        catch (error) { throw controller.explain(error, undefined, governedRole); }
-      }
-      return exclusive(async () => {
-        const { role: governedRole, task: governedTask, fresh: governedFresh } = args as {
-          role: Role;
-          task: string;
-          fresh?: boolean;
-        };
+        role: Role;
+        task: string;
+        fresh?: boolean;
+      };
+      const run = async () => {
         try {
-          return result(
-            await controller.delegate(ctx, governedRole, governedTask, signal, governedFresh === true),
-          );
+          return result(await controller.delegate(ctx, role, task, signal, fresh === true));
         } catch (error) {
           throw controller.explain(error, undefined, role);
         }
-      });
+      };
+      // Advisory documentation work can overlap the gated Test Engineer.
+      // It never commits a core transition or edits production/test paths.
+      return role === "documentation_steward" ? run() : exclusive(run);
     },
   });
   pi.registerTool({
