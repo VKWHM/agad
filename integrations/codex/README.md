@@ -24,7 +24,7 @@ Instructions and sandbox modes define and limit each role. This integration ship
 | **Architect** | `architect.toml` | `gpt-6.1-sol` | `high` | `read-only` | Dialogue, contract, coordination, delegation briefs. |
 | **Implementer** | `implementer.toml` | `gpt-6.1-sol` | `medium` | `workspace-write` | Approved outcomes in approved production paths; local verification. |
 | **Business Reviewer** | `business-reviewer.toml` | `gpt-6.1-sol` | `medium` | `read-only` | Scenario-first business review; not code review. |
-| **Documentation Steward** | `documentation-steward.toml` | `gpt-6-luna` | `medium` | `workspace-write` | Minimal documentation reconciliation after provisional approval; only approved documentation paths. |
+| **Documentation Steward** | `documentation-steward.toml` | `gpt-6-luna` | `medium` | `workspace-write` | Autonomous documentation reconciliation after implementation; prefreeze Rustdoc only. |
 | **Test Engineer** | `test-engineer.toml` | `gpt-6.1-terra` | `high` | `workspace-write` | Independent tests in approved test paths after the gate. |
 | **Scout** | `scout.toml` | `gpt-6-luna` | `low` | `read-only` | Read-only evidence. |
 | **Decision Partner** | `decision-partner.toml` | `gpt-6.1-sol` | `high` | `read-only` | Advisory only. |
@@ -181,4 +181,4 @@ The Developer conducts human code review of the actual diff and test results and
 | **Code Footprint** | ~3,500 lines of custom TypeScript & bridge scripts | No runtime code; declarative TOML agent definitions & Markdown instructions |
 
 ### Documentation Steward
-After business-review disposition and provisional approval, delegate documentation reconciliation alongside testing. Approve documentation-only paths disjoint from production/test paths; Rustdoc corrections must return through the Implementer and candidate refresh. The Steward may report no change, and its report remains advisory.
+After implementation exists, delegate the Documentation Steward without waiting for business-review disposition or provisional approval. It can directly maintain authorized Markdown and, when coordinated before the immutable candidate is submitted, Rustdoc comments only. Frozen-source corrections use the normal Implementer repair and refreshed candidate. Its report remains advisory and may contain no changes.

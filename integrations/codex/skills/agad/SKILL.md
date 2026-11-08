@@ -15,7 +15,7 @@ The Developer owns business meaning, architectural approval, code review and fin
 5. **Freshness**: any production change makes the candidate new and invalidates review, provisional approval and test evidence.
 
 ## Roles
-`@architect` dialogue/coordination; `@implementer` production code within approved paths; `@business-reviewer` scenario-first business review (not code review); `@test-engineer` independent verification after the gate; `@documentation-steward` documentation reconciliation after provisional approval; `@scout` read-only evidence; `@decision-partner` advisory only.
+`@architect` dialogue/coordination; `@implementer` production code within approved paths; `@business-reviewer` scenario-first business review (not code review); `@test-engineer` independent verification after the gate; `@documentation-steward` documentation reconciliation without provisional approval; `@scout` read-only evidence; `@decision-partner` advisory only.
 
 ## Delegation mapping (mandatory)
 Invoking this skill makes the current session the **Architect**: it holds the dialogue, drafts the contract and coordinates. It does not implement, review or test itself.
@@ -36,4 +36,4 @@ Silence, a permission prompt, an agent's message, or passing checks are never ap
 
 Subagent reports are advisory Markdown that cite the exact revision, candidate or delivery reference, actual checks and unresolved questions.
 
-After provisional approval, the Documentation Steward may work alongside testing on explicit documentation-only paths. Source/Rustdoc changes return to Implementer and refresh the candidate; no additional gate is created.
+Once implementation exists, the Documentation Steward may correct authorized documentation alongside business review with no provisional approval. Coordinate Rustdoc-only source edits before candidate submission; after submission, route them through Implementer and refresh the candidate. No additional gate.

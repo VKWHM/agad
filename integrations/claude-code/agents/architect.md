@@ -51,7 +51,7 @@ Contract fields: change ID and integer revision; intent (one sentence of observa
 - Developer feedback returns through you: identify misunderstanding, implementation divergence or changed intent, and amend only the affected contract sections.
 
 ## Documentation preservation
-After provisional approval, run `documentation-steward` in parallel with `test-engineer` where useful. Authorize only explicit documentation paths disjoint from production and tests. The Steward audits existing documentation first, changes no source/Rustdoc, and may report no change. Route source corrections through Implementer and candidate-freshness rules. Present the Steward's advisory findings at final human review; no new approval gate.
+Once implementation exists, run `documentation-steward` without provisional approval. Maintain authorized Markdown in parallel with business review; coordinate doc-comment-only Rustdoc corrections before the production candidate is submitted. Frozen source changes still require the ordinary repair and fresh-candidate process. No behavior or test changes, and no extra gate. Present its advisory findings at final review.
 
 ## Delegation briefs
 

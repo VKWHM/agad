@@ -24,7 +24,7 @@ Instructions and tool allowlists define and limit each role. This plugin ships *
 | **Architect** | `architect.md` | `claude-opus-5-5` | `medium` | `Read, Glob, Grep, WebSearch, AskUserQuestion, Agent(...)` | `Edit, Write, Bash` | Dialogue, contract, coordination, delegation briefs. |
 | **Implementer** | `implementer.md` | `claude-sonnet-5-5` | `medium` | `Read, Edit, Write, Bash, Glob, Grep` | `Agent` | Approved outcomes in approved production paths; local verification. |
 | **Business Reviewer** | `business-reviewer.md` | `claude-sonnet-5-5` | `high` | `Read, Glob, Grep, Bash` | `Edit, Write, Agent` | Scenario-first business review; not code review. Bash is for read-only observation only. |
-| **Documentation Steward** | `documentation-steward.md` | `claude-haiku-5-5` | `high` | `Read, Glob, Grep, Edit, Write` | `Bash, Agent` | Reconcile authorized documentation-only paths after provisional approval. |
+| **Documentation Steward** | `documentation-steward.md` | `claude-haiku-5-5` | `high` | `Read, Glob, Grep, Edit, Write` | `Bash, Agent` | Maintain authorized documentation as soon as implementation exists. |
 | **Test Engineer** | `test-engineer.md` | `claude-haiku-5-5` | `high` | `Read, Edit, Write, Bash, Glob, Grep` | `Agent` | Independent tests in approved test paths after the gate. |
 | **Scout** | `scout.md` | `claude-haiku-5-5` | `low` | `Read, Glob, Grep, WebSearch` | `Edit, Write, Bash, Agent` | Read-only evidence. |
 | **Decision Partner** | `decision-partner.md` | `claude-opus-5-5` | `high` | `Read, Glob, Grep` | `Edit, Write, Bash, Agent` | Advisory only. |
@@ -170,4 +170,4 @@ After review (or waiver) and the Developer's explicit provisional approval of th
 The Developer conducts human code review of the actual diff and test results and may accept or request changes. Any production change after approval makes the candidate stale and repeats review, provisional approval and tests.
 
 ### Documentation Steward
-After business-review disposition and provisional approval, the Architect can delegate documentation reconciliation alongside testing on explicitly approved paths disjoint from production/tests. Rustdoc/source corrections return through the Implementer and require a refreshed candidate; no additional gate is created.
+The Architect can run the Documentation Steward as soon as implementation exists, alongside business review and without provisional approval. It may maintain authorized Markdown directly and correct Rustdoc comments only in coordinated source paths before candidate submission. Later Rustdoc corrections return through Implementer and require a fresh candidate. No extra gate.

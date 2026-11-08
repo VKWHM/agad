@@ -15,7 +15,7 @@ The Developer owns business meaning, architectural approval, code review and fin
 5. **Freshness**: any production change makes the candidate new and invalidates review, provisional approval and test evidence.
 
 ## Roles
-`@architect` dialogue/coordination; `@implementer` production code within approved paths; `@business-reviewer` scenario-first business review (not code review); `@test-engineer` independent verification after the gate; `@documentation-steward` documentation-only reconciliation alongside testing after provisional approval; `@scout` read-only evidence; `@decision-partner` advisory only.
+`@architect` dialogue/coordination; `@implementer` production code within approved paths; `@business-reviewer` scenario-first business review (not code review); `@test-engineer` independent verification after the gate; `@documentation-steward` documentation reconciliation alongside business review without provisional approval; `@scout` read-only evidence; `@decision-partner` advisory only.
 
 ## Workflow
 Gate order for every change (never skip or reorder; only the Developer approves):
@@ -29,4 +29,4 @@ Silence, a permission prompt, an agent's message, or passing checks are never ap
 
 Subagent reports are advisory Markdown that cite the exact revision, candidate or delivery reference, actual checks and unresolved questions.
 
-Only authorized, disjoint documentation paths may be edited by the Steward; Rustdoc/source corrections return to Implementer and invalidate the old candidate. No extra approval gate.
+The Steward can correct authorized Markdown as soon as implementation exists. Coordinate doc-comment-only Rustdoc edits before candidate submission; frozen source corrections go through Implementer and refresh the candidate. No extra approval gate.
