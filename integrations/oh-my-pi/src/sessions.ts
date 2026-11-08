@@ -29,6 +29,8 @@ export interface SessionRequest {
   signal?: AbortSignal;
   scope?: Scope;
   planning?: boolean;
+  /** Only the pre-submission Implementer pass can grant Rustdoc edit paths. */
+  rustdoc?: boolean;
   fresh?: boolean;
   runCheck?: (id: string, signal?: AbortSignal) => Promise<string>;
 }
@@ -294,7 +296,8 @@ async function runSessionWithParent(
         : role === "test_engineer"
           ? request.scope?.tests
           : role === "documentation_steward"
-            ? request.scope?.documentation
+            ? [...(request.scope?.documentation ?? []),
+               ...(request.rustdoc ? request.scope?.rustdoc ?? [] : [])]
             : undefined;
     const allowed = [
       ...readTools,
@@ -395,10 +398,18 @@ async function runSessionWithParent(
                   input && typeof input === "object" && "path" in input
                     ? input.path
                     : undefined;
-                if (role === "documentation_steward" &&
-                    (typeof path !== "string" || !/\.mdx?$/.test(path)))
-                  throw new Error("Documentation Steward may edit Markdown files only");
-                await allowWrite(ctx.cwd, path, writes ?? []);
+                if (role === "documentation_steward") {
+                  if (typeof path !== "string")
+                    throw new Error("Documentation edit must identify one path");
+                  if (/\.mdx?$/.test(path))
+                    await allowWrite(ctx.cwd, path, request.scope?.documentation ?? []);
+                  else if (request.rustdoc && /\.rs$/.test(path))
+                    await allowWrite(ctx.cwd, path, request.scope?.rustdoc ?? []);
+                  else
+                    throw new Error("Documentation Steward may edit only authorized Markdown or prefreeze Rustdoc");
+                } else {
+                  await allowWrite(ctx.cwd, path, writes ?? []);
+                }
               } catch (e) {
                 return { block: true, reason: String(e) };
               }

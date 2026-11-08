@@ -188,7 +188,7 @@ export default function agad(pi: ExtensionAPI) {
       scope_json: z
         .string()
         .describe(
-          "Scope JSON string: { production: string[], tests: string[], documentation?: string[] (Markdown-only, explicitly approved, disjoint), checks: Record<string, string[]> } where checks maps each check ID from required_checks to its exact command argv array, e.g. { \"test\": [\"bunx\", \"nx\", \"test\", \"@birbase/checkout\"] }",
+          "Scope JSON string: { production: string[], tests: string[], documentation?: string[] (Markdown-only, disjoint), rustdoc?: string[] (exact .rs paths inside production for pre-submission doc-comment pass), checks: Record<string, string[]> } where checks maps each check ID from required_checks to its exact command argv array, e.g. { \"test\": [\"bunx\", \"nx\", \"test\", \"@birbase/checkout\"] }",
         ),
     }),
     async execute(_id, args, signal, _update, ctx) {
@@ -322,7 +322,7 @@ export default function agad(pi: ExtensionAPI) {
     name: "agad_delegate",
     label: "Delegate governed task",
     description:
-      "Run scout, implementer, business_reviewer, test_engineer or documentation_steward on the exact assigned model/effort. The Steward audits documentation in separate approved paths after provisional approval; it does not advance the core state. Phase gates: implementer needs 'authorized'; business_reviewer 'implemented'; test_engineer 'test_authorized'. Implementer, Business Reviewer and Test Engineer sessions stay alive across follow-up calls (registered as `agad-implementer`, `agad-business-reviewer`, `agad-test-engineer` on OMP IRC); pass `fresh: true` only when you want to discard the existing worker session and spawn a clean one.",
+      "Run scout, implementer, business_reviewer, test_engineer or documentation_steward on the exact assigned model/effort. The Steward maintains scoped Markdown from the implemented candidate without provisional approval; a scoped Rustdoc pass can run before the candidate is frozen. No new core state. Phase gates: implementer needs 'authorized'; business_reviewer 'implemented'; test_engineer 'test_authorized'. Implementer, Business Reviewer and Test Engineer sessions stay alive across follow-up calls (registered as `agad-implementer`, `agad-business-reviewer`, `agad-test-engineer` on OMP IRC); pass `fresh: true` only when you want to discard the existing worker session and spawn a clean one.",
     approval: "exec",
     parameters: z.object({
       role: z.enum([

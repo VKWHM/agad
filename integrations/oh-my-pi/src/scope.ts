@@ -64,3 +64,12 @@ export async function fingerprint(cwd: string, paths: string[]) {
   for (const path of [...paths].sort()) await visit(path);
   return `sha256:${hash.digest("hex")}`;
 }
+
+
+/** Reject any Rust source edit that changes something other than line Rustdoc comments. */
+export function rustdocOnlyChanged(before: string, after: string): boolean {
+  // Keep all non-Rustdoc bytes (including ordinary comments, code and whitespace).
+  const withoutRustdoc = (text: string) =>
+    text.replace(/^[ \t]*\/\/(?:\/(?!\/)|!)[^\r\n]*(?:\r?\n|$)/gm, "");
+  return withoutRustdoc(before) === withoutRustdoc(after);
+}
