@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "agad",
+  "description": "AGAD Marketplace for Claude Code",
+  "owner": {
+    "name": "AGAD Contributors",
+    "email": "support@agad.dev"
+  },
+  "plugins": [
+    {
+      "name": "agad",
+      "version": "0.1.0",
+      "description": "Architecture-Governed Agentic Development (AGAD) for Claude Code: human authority, interactive domain dialogue, living domain contracts, and specialized subagents.",
+      "author": {
+        "name": "AGAD Contributors"
+      },
+      "source": "./",
+      "category": "development",
+      "homepage": "https://github.com/vkwhm/agad"
+    }
+  ]
+}

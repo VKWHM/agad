@@ -1,0 +1,32 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "agad",
+  "version": "0.1.0",
+  "description": "Architecture-Governed Agentic Development (AGAD) for Claude Code: human authority, interactive domain dialogue, living domain contracts, and specialized subagents.",
+  "author": {
+    "name": "AGAD Contributors",
+    "url": "https://github.com/vkwhm/agad"
+  },
+  "homepage": "https://github.com/vkwhm/agad",
+  "repository": "https://github.com/vkwhm/agad",
+  "license": "Apache-2.0",
+  "keywords": [
+    "agad",
+    "architecture",
+    "domain-driven-design",
+    "governance",
+    "living-contract",
+    "subagents",
+    "skills",
+    "claude-code"
+  ],
+  "skills": [
+    "./skills/agad/",
+    "./skills/agad-contract/",
+    "./skills/agad-review/",
+    "./skills/agad-test/"
+  ],
+  "commands": [
+    "./commands/"
+  ]
+}

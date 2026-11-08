@@ -6,13 +6,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 OMP = ROOT / "integrations/oh-my-pi/agents/implementer.md"
 CODEX = ROOT / "integrations/codex/agents/implementer.toml"
 CODEX_COPY = ROOT / "integrations/codex/.codex/agents/implementer.toml"
+CLAUDE = ROOT / "integrations/claude-code/agents/implementer.md"
 
 class ImplementerGuidanceTests(unittest.TestCase):
     def test_codex_copies_match(self):
         self.assertEqual(CODEX.read_bytes(), CODEX_COPY.read_bytes())
 
     def test_guidance_preserves_economy_and_governance(self):
-        for p in (OMP, CODEX):
+        for p in (OMP, CODEX, CLAUDE):
             with self.subTest(path=str(p)):
                 content = p.read_text().lower()
                 for phrase in ("approved", "existing", "root cause", "invariant", "risk", "architect", "test"):

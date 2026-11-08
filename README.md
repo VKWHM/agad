@@ -4,7 +4,7 @@
 
 The developer owns business meaning and final acceptance. The Architect develops shared understanding through dialogue. Supporting roles explore, implement, discover business questions, and test approved outcomes.
 
-Status: **0.1.0 draft specification**, ready for developer review. This repository covers the abstraction only. The core has no harness or provider dependency. Integrations provide harness-specific adaptations, including the experimental [Oh My Pi plugin](integrations/oh-my-pi/README.md) the instruction-guided [Codex integration](integrations/codex/README.md), and the natural-language [Antigravity CLI integration](integrations/antigravity/README.md).
+Status: **0.1.0 draft specification**, ready for developer review. This repository covers the abstraction only. The core has no harness or provider dependency. Integrations provide harness-specific adaptations, including the experimental [Oh My Pi plugin](integrations/oh-my-pi/README.md), the instruction-guided [Codex integration](integrations/codex/README.md), the natural-language [Antigravity CLI integration](integrations/antigravity/README.md), and the native [Claude Code plugin](integrations/claude-code/README.md).
 
 ## Required workflow
 
