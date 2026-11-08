@@ -12,7 +12,7 @@ export const profiles = {
   scout: { id: "gpt-6-luna", effort: Effort.Low },
   implementer: { id: "gpt-6.1-sol", effort: Effort.Medium },
   business_reviewer: { id: "gpt-6.1-sol", effort: Effort.Medium },
-  test_engineer: { id: "gpt-6-luna", effort: Effort.High },
+  test_engineer: { id: "gpt-6.1-terra", effort: Effort.High },
   decision_partner: { id: "gpt-6.1-sol", effort: Effort.Medium },
 } as const;
 export const readTools = ["read", "grep", "glob", "find", "web_search"];

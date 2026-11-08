@@ -1,7 +1,7 @@
 ---
 name: agad-test-engineer
 description: AGAD test-engineer role
-model: openai-codex/gpt-6-luna
+model: openai-codex/gpt-6.1-terra
 thinking-level: high
 tools: all native tools (shell, edit, write, web search, delegation) plus agad_run_check
 spawns: "*"

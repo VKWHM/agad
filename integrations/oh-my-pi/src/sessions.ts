@@ -81,7 +81,8 @@ async function runSessionWithParent(
   // full native tool set (shell, edit, write, web search, delegation, LSP, MCP,
   // IRC, skills, rules, context files) and stay alive across follow-up turns
   // unless `fresh: true` is requested. Early test planning, Scout and Decision
-  // Partner stay ephemeral and on explicit allowlists.
+  // Partner stay ephemeral, with no write, shell or delegation tools, but keep
+  // web search and the user's MCP servers.
   const unrestricted =
     !request.planning &&
     (role === "implementer" ||
@@ -309,7 +310,7 @@ async function runSessionWithParent(
       ...(unrestricted ? {} : { "compaction.enabled": false }),
     };
     const settings =
-      unrestricted && Settings.current
+      Settings.current
         ? (await Settings.current).overlay(settingsOverrides)
         : Settings.isolated(settingsOverrides);
     const created = await createAgentSession({
@@ -331,9 +332,7 @@ async function runSessionWithParent(
         : {
             systemPrompt: promptText,
             toolNames: allowed,
-            restrictToolNames: true,
-            allowRestrictedCustomTools: true,
-            enableMCP: false,
+            enableMCP: true,
             enableIrc: false,
             enableLsp: false,
             skills: [],
@@ -379,7 +378,10 @@ async function runSessionWithParent(
           );
           api.on("tool_call", async (event) => {
             if (unrestricted) return;
-            if (!allowed.includes(event.toolName))
+            if (
+              !allowed.includes(event.toolName) &&
+              !event.toolName.startsWith("mcp__")
+            )
               return { block: true, reason: "Tool outside role allowlist" };
             if (event.toolName === "edit" || event.toolName === "write") {
               try {

@@ -193,9 +193,10 @@ test("partner can delegate research only to read-only mapped Scout sessions", as
     expect(tools).not.toContain("write");
     expect(tools).not.toContain("edit");
     expect(tools).not.toContain("task");
-    expect(options.enableMCP).toBe(false);
+    expect(tools).toContain("web_search");
+    expect(options.enableMCP).toBe(true);
     expect(options.disableExtensionDiscovery).toBe(true);
-    expect(options.restrictToolNames).toBe(true);
+    expect(options.restrictToolNames).toBeUndefined();
     expect(options.bindProcessState).toBe(false);
     expect(h.settingsOverrides[index]?.["retry.enabled"]).toBe(false);
     expect(h.settingsOverrides[index]?.["retry.fallbackChains"]).toEqual({});
