@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { append, validate } from "../src/core.ts";
 import { profiles, profile, assertIdentity } from "../src/roles.ts";
-import { allowWrite, fingerprint } from "../src/scope.ts";
+import { allowWrite, fingerprint, rustdocOnlyChanged } from "../src/scope.ts";
 import { Controller } from "../src/controller.ts";
 import { normalizeScope } from "../src/contract-normalization.ts";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
@@ -100,6 +100,15 @@ test("candidate fingerprint detects source changes but not test edits", async ()
   await writeFile(join(cwd, "src", "domain.ts"), "after");
   expect(await fingerprint(cwd, ["src"])).not.toBe(before);
 });
+test("Rustdoc-only edits preserve every executable source byte", () => {
+  const before = "pub fn run() -> u8 { 1 }\n/// First guarantee\npub struct Payment;\n";
+  const after = "//! Crate contract\npub fn run() -> u8 { 1 }\n/// Updated guarantee\npub struct Payment;\n";
+  expect(rustdocOnlyChanged(before, after)).toBe(true);
+  expect(rustdocOnlyChanged(before, after.replace("1 }", "2 }"))).toBe(false);
+  expect(rustdocOnlyChanged(before, before.replace("pub struct Payment;", "pub struct Other;"))).toBe(false);
+  expect(rustdocOnlyChanged("// ordinary\n", "/// documentation\n")).toBe(false);
+});
+
 test("final approval refuses an in-flight documentation worker", async () => {
   const controller = new Controller({} as ExtensionAPI, "openai-codex");
   controller.activeDocumentation = 1;
@@ -112,6 +121,8 @@ test("documentation scope stays explicit, Markdown-only and disjoint", async () 
     production: ["src"], tests: ["tests"], documentation: ["docs"], checks: {},
   });
   expect(scope.documentation).toEqual(["docs"]);
+  expect(scope.rustdoc).toEqual([]);
+  expect(normalizeScope({ production: ["src"], tests: [], rustdoc: ["src/lib.rs"], checks: {} }).rustdoc).toEqual(["src/lib.rs"]);
   await allowWrite(cwd, "docs/overview.md", scope.documentation ?? []);
   await expect(allowWrite(cwd, "src/lib.rs", scope.documentation ?? [])).rejects.toThrow();
   const controller = new Controller({} as ExtensionAPI, "openai-codex");
@@ -119,7 +130,16 @@ test("documentation scope stays explicit, Markdown-only and disjoint", async () 
     { cwd } as ExtensionContext, "test-change", structuredClone(source.contracts[0]),
     { production: ["src"], tests: ["tests"], documentation: ["src/domain.md"], checks: {} },
   )).rejects.toThrow("disjoint");
-  await expect(controller.delegate({} as ExtensionContext, "documentation_steward", "Audit")).rejects.toThrow("provisional approval");
+  await expect(controller.delegate({} as ExtensionContext, "documentation_steward", "Audit")).rejects.toThrow("implementation candidate");
+  await expect(controller.contract(
+    { cwd } as ExtensionContext, "test-change", structuredClone(source.contracts[0]),
+    { production: ["src"], tests: ["tests"], rustdoc: ["tests/test.rs"], checks: {} },
+  )).rejects.toThrow("inside production");
+  await expect(controller.contract(
+    { cwd } as ExtensionContext, "test-change", structuredClone(source.contracts[0]),
+    { production: ["src"], tests: ["tests"], rustdoc: ["src"], checks: {} },
+  )).rejects.toThrow("exact .rs");
+
 });
 test("pending question blocks delegation before any model call", async () => {
   const controller = new Controller({} as ExtensionAPI, "openai-codex");
