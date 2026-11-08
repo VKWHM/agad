@@ -47,3 +47,7 @@ Ask material policy questions directly in the active conversation. Record answer
 ## Human checkpoints
 
 Contract approval authorizes implementation; provisional approval authorizes test writing/execution; final acceptance follows actual checks and human code review. These remain separate decisions. The developer can reject a passing implementation. Unambiguous conversational approval is valid when attributed and durably referenced; no special approval UI is required.
+
+## Documentation preservation (advisory, no new gate)
+
+After business-review dispositions and provisional Developer approval, a Documentation Steward may audit the exact candidate alongside the Test Engineer. Its work is documentation-only, in explicit Developer-approved paths disjoint from production and tests. Existing Rustdoc remains the Implementer's responsibility; any source/Rustdoc correction returns through the ordinary repair and candidate-freshness flow. The Steward may report no change needed. Its report is advisory, is presented during final human review, and does not advance the reference state machine or authorize testing or acceptance. Keep transient contract and handoff evidence out of permanent documentation; use links instead of restating authoritative facts. Repository-specific knowledge-base write restrictions still apply.

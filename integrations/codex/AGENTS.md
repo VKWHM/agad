@@ -33,6 +33,7 @@ Role instructions are the specification of the process. Each agent's `sandbox_mo
 | Architect | Dialogue, contract, coordination. Does not edit production or tests, and cannot approve. |
 | Implementer | Production changes within approved paths only. No new semantics, architecture, dependencies, contract edits or acceptance. |
 | Business Reviewer | Read-only business review. Not a code reviewer; no approval power. |
+| Documentation Steward | After provisional approval, reconcile documentation in explicitly approved paths disjoint from source/tests; no Rustdoc/source edits or new authority. |
 | Test Engineer | Tests in approved test paths after the gate. Never edits production, weakens assertions or invents expectations. |
 | Scout | Read-only evidence; no decisions. |
 | Decision Partner | Read-only advisory; cannot answer for the Developer. |

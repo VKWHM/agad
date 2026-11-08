@@ -10,6 +10,8 @@ Every handoff includes `change_id`, contract ID/revision, sender role, recipient
 | Implementer → Architect → Business Reviewer | Candidate ID, outcome mapping, changed paths, checks and deviations | Same contract/candidate; inspect business alignment independently |
 | Business Reviewer → Architect ↔ Developer | Findings, alignment status aligned/misaligned/uncertain; evidence, impact, questions | Each finding is a violation, new scenario, ambiguity, or risk; speculation is labeled |
 | Architect → Test Engineer | Provisional developer approval, finding dispositions, exact candidate, approved outcomes/invariants | Approval follows business review and covers current candidate |
+| Architect → Documentation Steward | Exact approved revision/candidate, resolved findings, source documentation locations, explicitly authorized documentation paths disjoint from production/tests | Provisional approval is current; no new business semantics or source edits |
+| Documentation Steward → Architect → Developer | Changed documentation paths or no-change report; evidence, stale/duplicate statements, unresolved gaps | Changes stay within approved paths; no test or production candidate changed |
 | Test Engineer → Architect → Developer | Delivery reference, covered/missing outcome IDs, actual commands/results, defects, gaps and risks | Required checks passed; gaps are explicit; code diff is available for human review |
 
 Business Reviewer first derives scenarios independently from approved requirements and invariants, then inspects the candidate. Reports include alignment, classification and impact; an IDs-only findings list is insufficient in the reference format.

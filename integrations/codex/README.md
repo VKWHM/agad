@@ -24,6 +24,7 @@ Instructions and sandbox modes define and limit each role. This integration ship
 | **Architect** | `architect.toml` | `gpt-6.1-sol` | `high` | `read-only` | Dialogue, contract, coordination, delegation briefs. |
 | **Implementer** | `implementer.toml` | `gpt-6.1-sol` | `medium` | `workspace-write` | Approved outcomes in approved production paths; local verification. |
 | **Business Reviewer** | `business-reviewer.toml` | `gpt-6.1-sol` | `medium` | `read-only` | Scenario-first business review; not code review. |
+| **Documentation Steward** | `documentation-steward.toml` | `gpt-6-luna` | `medium` | `workspace-write` | Minimal documentation reconciliation after provisional approval; only approved documentation paths. |
 | **Test Engineer** | `test-engineer.toml` | `gpt-6.1-terra` | `high` | `workspace-write` | Independent tests in approved test paths after the gate. |
 | **Scout** | `scout.toml` | `gpt-6-luna` | `low` | `read-only` | Read-only evidence. |
 | **Decision Partner** | `decision-partner.toml` | `gpt-6.1-sol` | `high` | `read-only` | Advisory only. |
@@ -41,7 +42,7 @@ AGAD is packaged as a standard **Codex Plugin** with native skills, subagent def
   - `$agad-contract`: Drafts, refines, and validates Living Domain Contracts (intent, rationale, vocabulary, invariants, requirements, scope).
   - `$agad-review`: Conducts independent business reviews (derives domain scenarios and edge cases before code inspection).
   - `$agad-test`: Designs and runs automated verification against approved outcomes without compromising assertions.
-- **Subagents**: Native Codex subagents (`@architect`, `@implementer`, `@business-reviewer`, `@test-engineer`, `@scout`, `@decision-partner`).
+- **Subagents**: Native Codex subagents (`@architect`, `@implementer`, `@business-reviewer`, `@test-engineer`, `@documentation-steward`, `@scout`, `@decision-partner`).
 
 ---
 
@@ -59,7 +60,7 @@ codex plugin marketplace add /path/to/agad/integrations/codex
 codex plugin add agad@agad
 ```
 
-The plugin manifest ships skills only, so `install.sh plugin` also copies the six role agents to `~/.codex/agents/`. Without them `$agad` cannot spawn the named roles and must stop rather than substitute a generic worker.
+The plugin manifest ships skills only, so `install.sh plugin` also copies the role agents to `~/.codex/agents/`. Without them `$agad` cannot spawn the named roles and must stop rather than substitute a generic worker.
 
 Once installed, AGAD skills (`$agad`, `$agad-contract`, `$agad-review`, `$agad-test`) are immediately recognized and available across your Codex sessions!
 
@@ -178,3 +179,6 @@ The Developer conducts human code review of the actual diff and test results and
 | **Tool Restrictions** | Strict tool allowlists per role, tool stripping | Per-role `sandbox_mode`; path scopes are instruction-only |
 | **Output Formats** | Rigid single-line JSON reply shapes (no prose, no fences) | Natural, expressive, human-readable Markdown |
 | **Code Footprint** | ~3,500 lines of custom TypeScript & bridge scripts | No runtime code; declarative TOML agent definitions & Markdown instructions |
+
+### Documentation Steward
+After business-review disposition and provisional approval, delegate documentation reconciliation alongside testing. Approve documentation-only paths disjoint from production/test paths; Rustdoc corrections must return through the Implementer and candidate refresh. The Steward may report no change, and its report remains advisory.
