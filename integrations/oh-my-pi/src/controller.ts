@@ -380,16 +380,23 @@ export class Controller {
 
     if (!normalizedScope.production.length)
       throw new Error("Production scope cannot be empty");
-    for (const path of [...normalizedScope.production, ...normalizedScope.tests])
+    for (const path of [...normalizedScope.production, ...normalizedScope.tests, ...(normalizedScope.documentation ?? [])])
       await safePath(ctx.cwd, path);
-    // Production and test scope cannot overlap: test writes must preserve the candidate.
-    for (const production of normalizedScope.production)
-      for (const test of normalizedScope.tests) {
-        const p = await safePath(ctx.cwd, production),
-          t = await safePath(ctx.cwd, test);
-        if (p === t || p.startsWith(t + "/") || t.startsWith(p + "/"))
-          throw new Error("Production and test scopes must be disjoint");
-      }
+    // Documentation work must not mutate the approved production candidate or tests.
+    const groups = [
+      normalizedScope.production,
+      normalizedScope.tests,
+      normalizedScope.documentation ?? [],
+    ];
+    for (let i = 0; i < groups.length; i++)
+      for (let j = i + 1; j < groups.length; j++)
+        for (const left of groups[i])
+          for (const right of groups[j]) {
+            const a = await safePath(ctx.cwd, left),
+              b = await safePath(ctx.cwd, right);
+            if (a === b || a.startsWith(b + "/") || b.startsWith(a + "/"))
+              throw new Error("Production, test and documentation scopes must be disjoint");
+          }
     for (const [id, argv] of Object.entries(normalizedScope.checks))
       if (
         !id.trim() ||
@@ -475,6 +482,35 @@ export class Controller {
         "Architect is interactive; Decision Partner is available only through a pending question",
       );
     const phase = this.state.phase;
+    if (role === "documentation_steward") {
+      if (!["test_authorized", "tested", "test_failed"].includes(phase))
+        throw new Error("Documentation Steward requires provisional approval");
+      const documentation = this.state.scope?.documentation ?? [];
+      if (!documentation.length)
+        throw new Error("No Developer-approved documentation paths");
+      const contract = this.current();
+      const candidate = this.candidate();
+      const generation = this.generation;
+      await this.fresh(ctx);
+      const before = await fingerprint(ctx.cwd, documentation);
+      const report = await runSession(this.pi, ctx, this.provider, {
+        role, signal, scope: this.state.scope, fresh,
+        prompt: markdownBrief(task, {
+          "Approved contract": contract,
+          "Resolved business review": this.state.record?.events.filter((e: Json) =>
+            ["submit_business_review", "waive_business_review", "provisionally_approve"].includes(e.type) &&
+            e.revision === contract.revision),
+          "Production candidate": candidate,
+          "Approved documentation paths": documentation,
+        }, "Audit existing documentation first. Edit only authorized Markdown paths; return concise evidence, changes or no change, and gaps."),
+      });
+      if (generation !== this.generation || this.current().revision !== contract.revision || this.candidate() !== candidate)
+        throw new Error("Candidate or session changed during documentation work");
+      await this.fresh(ctx);
+      const after = await fingerprint(ctx.cwd, documentation);
+      return JSON.stringify({ role, revision: contract.revision, candidate,
+        documentation_before: before, documentation_after: after, report });
+    }
     const expected =
       role === "implementer"
         ? "authorized"

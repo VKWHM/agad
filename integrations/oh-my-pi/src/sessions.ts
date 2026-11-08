@@ -293,7 +293,9 @@ async function runSessionWithParent(
         ? request.scope?.production
         : role === "test_engineer"
           ? request.scope?.tests
-          : undefined;
+          : role === "documentation_steward"
+            ? request.scope?.documentation
+            : undefined;
     const allowed = [
       ...readTools,
       ...(writes?.length ? ["edit", "write"] : []),
@@ -332,7 +334,7 @@ async function runSessionWithParent(
         : {
             systemPrompt: promptText,
             toolNames: allowed,
-            enableMCP: true,
+            enableMCP: role !== "documentation_steward",
             enableIrc: false,
             enableLsp: false,
             skills: [],
@@ -378,6 +380,8 @@ async function runSessionWithParent(
           );
           api.on("tool_call", async (event) => {
             if (unrestricted) return;
+            if (role === "documentation_steward" && event.toolName.startsWith("mcp__"))
+              return { block: true, reason: "Documentation Steward cannot invoke MCP tools" };
             if (
               !allowed.includes(event.toolName) &&
               !event.toolName.startsWith("mcp__")
@@ -391,6 +395,9 @@ async function runSessionWithParent(
                   input && typeof input === "object" && "path" in input
                     ? input.path
                     : undefined;
+                if (role === "documentation_steward" &&
+                    (typeof path !== "string" || !/\.mdx?$/.test(path)))
+                  throw new Error("Documentation Steward may edit Markdown files only");
                 await allowWrite(ctx.cwd, path, writes ?? []);
               } catch (e) {
                 return { block: true, reason: String(e) };

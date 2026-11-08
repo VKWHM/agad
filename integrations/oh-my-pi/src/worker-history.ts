@@ -19,6 +19,7 @@ const WORKER_ROLES: Record<Exclude<Role, "architect">, true> = {
   implementer: true,
   business_reviewer: true,
   test_engineer: true,
+  documentation_steward: true,
   decision_partner: true,
 };
 const WORKER_STATUSES: Record<WorkerStatus, true> = {

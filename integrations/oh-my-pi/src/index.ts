@@ -188,7 +188,7 @@ export default function agad(pi: ExtensionAPI) {
       scope_json: z
         .string()
         .describe(
-          "Scope JSON string: { production: string[], tests: string[], checks: Record<string, string[]> } where checks maps each check ID from required_checks to its exact command argv array, e.g. { \"test\": [\"bunx\", \"nx\", \"test\", \"@birbase/checkout\"] }",
+          "Scope JSON string: { production: string[], tests: string[], documentation?: string[] (Markdown-only, explicitly approved, disjoint), checks: Record<string, string[]> } where checks maps each check ID from required_checks to its exact command argv array, e.g. { \"test\": [\"bunx\", \"nx\", \"test\", \"@birbase/checkout\"] }",
         ),
     }),
     async execute(_id, args, signal, _update, ctx) {
@@ -322,7 +322,7 @@ export default function agad(pi: ExtensionAPI) {
     name: "agad_delegate",
     label: "Delegate governed task",
     description:
-      "Run scout, implementer, business_reviewer or test_engineer on the exact assigned model/effort. Core gates, candidate fingerprints and required checks are enforced. Phase gates: implementer needs 'authorized'; business_reviewer 'implemented'; test_engineer 'test_authorized'. Implementer, Business Reviewer and Test Engineer sessions stay alive across follow-up calls (registered as `agad-implementer`, `agad-business-reviewer`, `agad-test-engineer` on OMP IRC); pass `fresh: true` only when you want to discard the existing worker session and spawn a clean one.",
+      "Run scout, implementer, business_reviewer, test_engineer or documentation_steward on the exact assigned model/effort. The Steward audits documentation in separate approved paths after provisional approval; it does not advance the core state. Phase gates: implementer needs 'authorized'; business_reviewer 'implemented'; test_engineer 'test_authorized'. Implementer, Business Reviewer and Test Engineer sessions stay alive across follow-up calls (registered as `agad-implementer`, `agad-business-reviewer`, `agad-test-engineer` on OMP IRC); pass `fresh: true` only when you want to discard the existing worker session and spawn a clean one.",
     approval: "exec",
     parameters: z.object({
       role: z.enum([
@@ -330,6 +330,7 @@ export default function agad(pi: ExtensionAPI) {
         "implementer",
         "business_reviewer",
         "test_engineer",
+        "documentation_steward",
       ]),
       task: z
         .string()
@@ -340,15 +341,26 @@ export default function agad(pi: ExtensionAPI) {
         .describe("Set true only to discard the kept-alive worker session for this role and spawn a clean session."),
     }),
     async execute(_id, args, signal, _update, ctx) {
+      const { role, task, fresh } = args as {
+          role: Role;
+          task: string;
+          fresh?: boolean;
+        };
+      // Documentation is an independent advisory worker: it may run while
+      // the Test Engineer is using the core's exclusive transition path.
+      if (role === "documentation_steward") {
+        try { return result(await controller.delegate(ctx, role, task, signal, fresh === true)); }
+        catch (error) { throw controller.explain(error, undefined, governedRole); }
+      }
       return exclusive(async () => {
-        const { role, task, fresh } = args as {
+        const { role: governedRole, task: governedTask, fresh: governedFresh } = args as {
           role: Role;
           task: string;
           fresh?: boolean;
         };
         try {
           return result(
-            await controller.delegate(ctx, role, task, signal, fresh === true),
+            await controller.delegate(ctx, governedRole, governedTask, signal, governedFresh === true),
           );
         } catch (error) {
           throw controller.explain(error, undefined, role);

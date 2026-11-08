@@ -6,6 +6,7 @@ export type Role =
   | "implementer"
   | "business_reviewer"
   | "test_engineer"
+  | "documentation_steward"
   | "decision_partner";
 export const profiles = {
   architect: { id: "gpt-6.1-sol", effort: Effort.High },
@@ -13,6 +14,7 @@ export const profiles = {
   implementer: { id: "gpt-6.1-sol", effort: Effort.Medium },
   business_reviewer: { id: "gpt-6.1-sol", effort: Effort.Medium },
   test_engineer: { id: "gpt-6.1-terra", effort: Effort.High },
+  documentation_steward: { id: "gpt-6-luna", effort: Effort.Medium },
   decision_partner: { id: "gpt-6.1-sol", effort: Effort.Medium },
 } as const;
 export const readTools = ["read", "grep", "glob", "find", "web_search"];

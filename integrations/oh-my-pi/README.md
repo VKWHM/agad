@@ -14,7 +14,7 @@ omp --no-extensions --no-prewalk --no-title --extension "$PWD" --cwd /absolute/p
 
 This explicit launch loads AGAD for that session. It does not install a global plugin or modify your global model assignments. `AGAD_OMP_PROVIDER` defaults to `openai-codex`; a different provider may be selected only if its registry exposes the same exact model IDs and efforts. Missing access blocks execution rather than substituting a model.
 
-Ask the Architect for one small change. It teaches back the intended outcomes, proposes a versioned Living Domain Contract, and asks for your approval of the contract, disjoint production/test paths and exact test-command argument arrays. The Architect is read-only and delegates through governed tools.
+Ask the Architect for one small change. It teaches back the intended outcomes, proposes a versioned Living Domain Contract, and asks for your approval of the contract, disjoint production/test paths, optional documentation-only paths and exact test-command argument arrays. The Architect is read-only and delegates through governed tools.
 
 ## Live AGAD panel
 
@@ -29,6 +29,7 @@ The two short text rows use OMP's native word wrapping at narrow widths. No ques
 | Architect | `gpt-6.1-sol` | high | Interactive coordination, read/research, governed handoffs |
 | Implementer | `gpt-6.1-sol` | medium | Read/research; edit/write approved production paths |
 | Business Reviewer | `gpt-6.1-sol` | medium; high for critical contracts | Read/research; business scenario discovery |
+| Documentation Steward | `gpt-6-luna` | medium | Scoped Markdown edits after provisional approval; no production, tests, shell, MCP or delegation |
 | Test Engineer | `gpt-6.1-terra` | high | Early read-only planning; after approval, approved test paths and exact check IDs |
 | Scout | `gpt-6-luna` | low | Read-only repository/web research; no delegation |
 | Decision Partner | `gpt-6.1-sol` | medium | Read-only discussion/research; may spawn only research Scouts |
@@ -147,3 +148,6 @@ API references for the targeted upstream tag `v18.10.4`, commit `687892d1046ecaf
 - [Native ask dialog and Chat about this result](https://github.com/can1357/oh-my-pi/blob/v18.10.4/packages/tui/src/overlays/ask-dialog.ts)
 - [Restricted SDK session options](https://github.com/can1357/oh-my-pi/blob/v18.10.4/packages/coding-agent/src/sdk.ts)
 - [Agent discovery and model overrides](https://github.com/can1357/oh-my-pi/blob/v18.10.4/docs/task-agent-discovery.md)
+
+### Documentation Steward
+Optional `scope_json.documentation` declares Developer-approved Markdown paths, disjoint from both production and tests. After provisional approval, `agad_delegate(role: "documentation_steward")` can run alongside the Test Engineer. The Steward has only read/search and path-checked Markdown edit/write tools, with no shell, MCP or delegation; it does not emit a core transition. Rustdoc/source changes belong to the Implementer and invalidate the approved candidate. The Architect reviews its advisory report before final acceptance. This is not a new governance gate.

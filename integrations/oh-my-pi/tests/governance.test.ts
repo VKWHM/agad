@@ -7,6 +7,7 @@ import { append, validate } from "../src/core.ts";
 import { profiles, profile, assertIdentity } from "../src/roles.ts";
 import { allowWrite, fingerprint } from "../src/scope.ts";
 import { Controller } from "../src/controller.ts";
+import { normalizeScope } from "../src/contract-normalization.ts";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import agad from "../src/index.ts";
 const source = await Bun.file(
@@ -35,6 +36,7 @@ test("exact source model and effort mapping, including user-selected partner", (
     effort: "low",
   });
   expect(String(profiles.test_engineer.effort)).toBe("high");
+  expect(profiles.documentation_steward).toEqual({ id: "gpt-6-luna", effort: "medium" });
   expect(String(profiles.decision_partner.effort)).toBe("medium");
   expect(String(profile("business_reviewer", true).effort)).toBe("high");
 });
@@ -97,6 +99,22 @@ test("candidate fingerprint detects source changes but not test edits", async ()
   expect(await fingerprint(cwd, ["src"])).toBe(before);
   await writeFile(join(cwd, "src", "domain.ts"), "after");
   expect(await fingerprint(cwd, ["src"])).not.toBe(before);
+});
+test("documentation scope stays explicit, Markdown-only and disjoint", async () => {
+  const cwd = await workspace();
+  await mkdir(join(cwd, "docs"));
+  const scope = normalizeScope({
+    production: ["src"], tests: ["tests"], documentation: ["docs"], checks: {},
+  });
+  expect(scope.documentation).toEqual(["docs"]);
+  await allowWrite(cwd, "docs/overview.md", scope.documentation ?? []);
+  await expect(allowWrite(cwd, "src/lib.rs", scope.documentation ?? [])).rejects.toThrow();
+  const controller = new Controller({} as ExtensionAPI, "openai-codex");
+  await expect(controller.contract(
+    { cwd } as ExtensionContext, "test-change", structuredClone(source.contracts[0]),
+    { production: ["src"], tests: ["tests"], documentation: ["src/domain.md"], checks: {} },
+  )).rejects.toThrow("disjoint");
+  await expect(controller.delegate({} as ExtensionContext, "documentation_steward", "Audit")).rejects.toThrow("provisional approval");
 });
 test("pending question blocks delegation before any model call", async () => {
   const controller = new Controller({} as ExtensionAPI, "openai-codex");
