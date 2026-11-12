@@ -1,8 +1,9 @@
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
+import { readFile, writeFile } from "node:fs/promises";
 import { append, validate } from "./core.ts";
 import { askPending, isExplicitApproval } from "./dialog.ts";
 import { checkpointPresentation } from "./presentation.ts";
-import { fingerprint, safePath } from "./scope.ts";
+import { fingerprint, safePath, rustdocOnlyChanged } from "./scope.ts";
 import { runSession } from "./sessions.ts";
 import { markdownBrief, rolePrompt } from "./prompts.ts";
 import { generateConsultationMarkdown } from "./consultation-pane.ts";
@@ -49,6 +50,7 @@ export const architectTools = [
 export class Controller {
   state: AdapterState = { phase: "dialogue" };
   busy = false;
+  activeDocumentation = 0;
   generation = 0;
   constructor(
     readonly pi: ExtensionAPI,
@@ -291,6 +293,8 @@ export class Controller {
         throw new Error("Checkpoint refers to stale candidate");
     }
     if (event.type === "accept") {
+      if (this.activeDocumentation)
+        throw new Error("Documentation work is still running; review its report before acceptance");
       if (
         !this.state.verification ||
         (await fingerprint(ctx.cwd, this.state.scope!.tests)) !==
@@ -380,16 +384,33 @@ export class Controller {
 
     if (!normalizedScope.production.length)
       throw new Error("Production scope cannot be empty");
-    for (const path of [...normalizedScope.production, ...normalizedScope.tests])
+    for (const path of [...normalizedScope.production, ...normalizedScope.tests, ...(normalizedScope.documentation ?? []), ...(normalizedScope.rustdoc ?? [])])
       await safePath(ctx.cwd, path);
-    // Production and test scope cannot overlap: test writes must preserve the candidate.
-    for (const production of normalizedScope.production)
-      for (const test of normalizedScope.tests) {
-        const p = await safePath(ctx.cwd, production),
-          t = await safePath(ctx.cwd, test);
-        if (p === t || p.startsWith(t + "/") || t.startsWith(p + "/"))
-          throw new Error("Production and test scopes must be disjoint");
-      }
+    // Documentation work must not mutate the approved production candidate or tests.
+    const groups = [
+      normalizedScope.production,
+      normalizedScope.tests,
+      normalizedScope.documentation ?? [],
+    ];
+    for (let i = 0; i < groups.length; i++)
+      for (let j = i + 1; j < groups.length; j++)
+        for (const left of groups[i])
+          for (const right of groups[j]) {
+            const a = await safePath(ctx.cwd, left),
+              b = await safePath(ctx.cwd, right);
+            if (a === b || a.startsWith(b + "/") || b.startsWith(a + "/"))
+              throw new Error("Production, test and documentation scopes must be disjoint");
+          }
+    // A Rustdoc pass is an opt-in *source* edit before the candidate is frozen.
+    // Require exact Rust files within production, never a directory or test scope.
+    for (const path of normalizedScope.rustdoc ?? []) {
+      if (!path.endsWith(".rs"))
+        throw new Error("Rustdoc scope must name exact .rs files");
+      const target = await safePath(ctx.cwd, path);
+      const production = await Promise.all(normalizedScope.production.map((p) => safePath(ctx.cwd, p)));
+      if (!production.some((p) => target === p || target.startsWith(p + "/")))
+        throw new Error("Rustdoc scope must be inside production scope");
+    }
     for (const [id, argv] of Object.entries(normalizedScope.checks))
       if (
         !id.trim() ||
@@ -459,6 +480,45 @@ export class Controller {
     await this.commit({ ...event, evidence });
     return evidence;
   }
+  /**
+   * Finalize Rustdoc on the Implementer's draft *before* submit_implementation
+   * commits the immutable candidate. Never use this on a frozen candidate.
+   */
+  async documentDraft(ctx: ExtensionContext, contract: Json, signal?: AbortSignal) {
+    const files = this.state.scope?.rustdoc ?? [];
+    if (!files.length) return;
+    const originals = await Promise.all(files.map(async (path) => ({
+      path: await safePath(ctx.cwd, path),
+      content: await readFile(await safePath(ctx.cwd, path), "utf8"),
+    })));
+    try {
+      const report = await runSession(this.pi, ctx, this.provider, {
+        role: "documentation_steward",
+        scope: this.state.scope,
+        rustdoc: true,
+        signal,
+        prompt: markdownBrief(
+          "Check the Implementer's draft Rustdoc before candidate submission",
+          {
+            "Approved contract": contract,
+            "Rustdoc files": files,
+            "Optional Markdown paths": this.state.scope?.documentation ?? [],
+          },
+          "Edit only necessary /// or //! documentation lines in approved Rust files, and authorized Markdown. Never change executable Rust, ordinary comments, tests or business rules. Return concise evidence or no-change.",
+        ),
+      });
+      for (const original of originals) {
+        const after = await readFile(original.path, "utf8");
+        if (!rustdocOnlyChanged(original.content, after))
+          throw new Error(`Documentation Steward changed non-Rustdoc source: ${original.path}`);
+      }
+      return report;
+    } catch (error) {
+      // Roll back any Rustdoc source edits if validation or the worker fails.
+      await Promise.all(originals.map((file) => writeFile(file.path, file.content)));
+      throw error;
+    }
+  }
   async delegate(
     ctx: ExtensionContext,
     role: Role,
@@ -475,6 +535,42 @@ export class Controller {
         "Architect is interactive; Decision Partner is available only through a pending question",
       );
     const phase = this.state.phase;
+    if (role === "documentation_steward") {
+      if (!["implemented", "reviewed", "test_authorized", "tested", "test_failed"].includes(phase))
+        throw new Error("Documentation Steward requires an implementation candidate");
+      const documentation = this.state.scope?.documentation ?? [];
+      if (!documentation.length)
+        throw new Error("No Developer-approved documentation paths");
+      const contract = this.current();
+      const candidate = this.candidate();
+      const generation = this.generation;
+      if (this.activeDocumentation)
+        throw new Error("Documentation Steward is already running");
+      this.activeDocumentation++;
+      try {
+        await this.fresh(ctx);
+        const before = await fingerprint(ctx.cwd, documentation);
+        const report = await runSession(this.pi, ctx, this.provider, {
+          role, signal, scope: this.state.scope, fresh,
+        prompt: markdownBrief(task, {
+          "Approved contract": contract,
+          "Business review (if available)": this.state.record?.events.filter((e: Json) =>
+            ["submit_business_review", "waive_business_review"].includes(e.type) &&
+            e.revision === contract.revision),
+          "Production candidate": candidate,
+          "Approved documentation paths": documentation,
+        }, "Audit existing documentation first. Edit only authorized Markdown paths; return concise evidence, changes or no change, and gaps."),
+      });
+        if (generation !== this.generation || this.current().revision !== contract.revision || this.candidate() !== candidate)
+          throw new Error("Candidate or session changed during documentation work");
+        await this.fresh(ctx);
+        const after = await fingerprint(ctx.cwd, documentation);
+        return JSON.stringify({ role, revision: contract.revision, candidate,
+          documentation_before: before, documentation_after: after, report });
+      } finally {
+        this.activeDocumentation--;
+      }
+    }
     const expected =
       role === "implementer"
         ? "authorized"
@@ -594,6 +690,11 @@ export class Controller {
         false,
       );
       report = parse(output);
+    }
+    if (role === "implementer" && this.state.scope?.rustdoc?.length) {
+      const documentation = await this.documentDraft(ctx, contract, signal);
+      if (documentation)
+        report.evidence = `${report.evidence}\nRustdoc Steward: ${documentation.slice(0, 3000)}`;
     }
     const verifiedTests =
       role === "test_engineer"

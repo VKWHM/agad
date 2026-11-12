@@ -3,6 +3,10 @@ export type Json = Record<string, any>;
 export interface Scope {
   production: string[];
   tests: string[];
+  /** Explicitly approved Markdown-only paths, disjoint from production and tests. */
+  documentation?: string[];
+  /** Exact Rust source files for an optional doc-comment-only pass before candidate freeze. */
+  rustdoc?: string[];
   checks: Record<string, string[]>;
 }
 export interface PendingQuestion {

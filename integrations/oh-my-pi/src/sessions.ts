@@ -29,6 +29,8 @@ export interface SessionRequest {
   signal?: AbortSignal;
   scope?: Scope;
   planning?: boolean;
+  /** Only the pre-submission Implementer pass can grant Rustdoc edit paths. */
+  rustdoc?: boolean;
   fresh?: boolean;
   runCheck?: (id: string, signal?: AbortSignal) => Promise<string>;
 }
@@ -293,7 +295,10 @@ async function runSessionWithParent(
         ? request.scope?.production
         : role === "test_engineer"
           ? request.scope?.tests
-          : undefined;
+          : role === "documentation_steward"
+            ? [...(request.scope?.documentation ?? []),
+               ...(request.rustdoc ? request.scope?.rustdoc ?? [] : [])]
+            : undefined;
     const allowed = [
       ...readTools,
       ...(writes?.length ? ["edit", "write"] : []),
@@ -332,7 +337,7 @@ async function runSessionWithParent(
         : {
             systemPrompt: promptText,
             toolNames: allowed,
-            enableMCP: true,
+            enableMCP: role !== "documentation_steward",
             enableIrc: false,
             enableLsp: false,
             skills: [],
@@ -378,6 +383,8 @@ async function runSessionWithParent(
           );
           api.on("tool_call", async (event) => {
             if (unrestricted) return;
+            if (role === "documentation_steward" && event.toolName.startsWith("mcp__"))
+              return { block: true, reason: "Documentation Steward cannot invoke MCP tools" };
             if (
               !allowed.includes(event.toolName) &&
               !event.toolName.startsWith("mcp__")
@@ -391,7 +398,18 @@ async function runSessionWithParent(
                   input && typeof input === "object" && "path" in input
                     ? input.path
                     : undefined;
-                await allowWrite(ctx.cwd, path, writes ?? []);
+                if (role === "documentation_steward") {
+                  if (typeof path !== "string")
+                    throw new Error("Documentation edit must identify one path");
+                  if (/\.mdx?$/.test(path))
+                    await allowWrite(ctx.cwd, path, request.scope?.documentation ?? []);
+                  else if (request.rustdoc && /\.rs$/.test(path))
+                    await allowWrite(ctx.cwd, path, request.scope?.rustdoc ?? []);
+                  else
+                    throw new Error("Documentation Steward may edit only authorized Markdown or prefreeze Rustdoc");
+                } else {
+                  await allowWrite(ctx.cwd, path, writes ?? []);
+                }
               } catch (e) {
                 return { block: true, reason: String(e) };
               }

@@ -25,7 +25,7 @@ flowchart TD
 
 Test scenario planning may begin from the approved contract before implementation finishes. Test writing and execution still require provisional developer approval.
 
-Scout assists the Architect when repository evidence is needed. Six roles do not require six simultaneous processes. Role boundaries and approval gates apply regardless of deployment.
+Scout assists the Architect when repository evidence is needed. Roles do not require simultaneous processes. Once implementation exists, the Documentation Steward maintains authorized documentation alongside business review without provisional approval; a pre-submission pass can correct Rustdoc before the candidate is frozen. Documentation never grants testing or acceptance authority. Role boundaries and approval gates apply regardless of deployment.
 
 ## Read and use
 

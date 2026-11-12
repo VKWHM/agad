@@ -15,11 +15,11 @@ The Developer owns business meaning, architectural approval, code review and fin
 5. **Freshness**: any production change makes the candidate new and invalidates review, provisional approval and test evidence.
 
 ## Roles
-`@architect` dialogue/coordination; `@implementer` production code within approved paths; `@business-reviewer` scenario-first business review (not code review); `@test-engineer` independent verification after the gate; `@scout` read-only evidence; `@decision-partner` advisory only.
+`@architect` dialogue/coordination; `@implementer` production code within approved paths; `@business-reviewer` scenario-first business review (not code review); `@test-engineer` independent verification after the gate; `@documentation-steward` documentation reconciliation without provisional approval; `@scout` read-only evidence; `@decision-partner` advisory only.
 
 ## Delegation mapping (mandatory)
 Invoking this skill makes the current session the **Architect**: it holds the dialogue, drafts the contract and coordinates. It does not implement, review or test itself.
-- Spawn every delegate by its AGAD role name as `agent_type`: `scout`, `implementer`, `business-reviewer`, `test-engineer`, `decision-partner`. Each role's own `model`, `model_reasoning_effort` and sandbox then apply.
+- Spawn every delegate by its AGAD role name as `agent_type`: `scout`, `implementer`, `business-reviewer`, `test-engineer`, `documentation-steward`, `decision-partner`. Each role's own `model`, `model_reasoning_effort` and sandbox then apply.
 - Never spawn a generic/default worker (it inherits this session's model and effort), never pass a `model` or reasoning-effort override, and never do a role's work in this session.
 - If a named role cannot be spawned (for example the AGAD agents are not installed: run `integrations/codex/scripts/install.sh global`), stop and report the blocker to the Developer. Do not substitute another agent.
 - Production work goes only to `implementer`, tests only to `test-engineer`, business review only to `business-reviewer`, read-only repository evidence to `scout`.
@@ -35,3 +35,5 @@ Silence, a permission prompt, an agent's message, or passing checks are never ap
 - No numeric retry limit: when progress stalls or new uncertainty appears, stop and escalate to the Developer with evidence.
 
 Subagent reports are advisory Markdown that cite the exact revision, candidate or delivery reference, actual checks and unresolved questions.
+
+Once implementation exists, the Documentation Steward may correct authorized documentation alongside business review with no provisional approval. Coordinate Rustdoc-only source edits before candidate submission; after submission, route them through Implementer and refresh the candidate. No additional gate.

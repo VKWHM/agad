@@ -42,6 +42,17 @@ export function normalizeScope(raw: unknown): Scope {
     ? rawTests.filter((p): p is string => typeof p === "string" && Boolean(p.trim()))
     : [];
 
+  // Documentation-only paths are optional for older contracts.
+  const rawDocumentation = obj.documentation;
+  const documentation = Array.isArray(rawDocumentation)
+    ? rawDocumentation.filter((p): p is string => typeof p === "string" && Boolean(p.trim()))
+    : [];
+
+  const rawRustdoc = obj.rustdoc;
+  const rustdoc = Array.isArray(rawRustdoc)
+    ? rawRustdoc.filter((p): p is string => typeof p === "string" && Boolean(p.trim()))
+    : [];
+
   // 3. Normalize checks (accepting checks object or required_checks list of { id, argv })
   const checks: Record<string, string[]> = {};
   if (obj.checks && typeof obj.checks === "object" && !Array.isArray(obj.checks)) {
@@ -67,7 +78,7 @@ export function normalizeScope(raw: unknown): Scope {
     }
   }
 
-  return { production, tests, checks };
+  return { production, tests, documentation, rustdoc, checks };
 }
 
 export function normalizeContract(

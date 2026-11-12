@@ -10,7 +10,7 @@ An integration of **Architecture-Governed Agentic Development (AGAD)** designed 
 2. **The Architect develops shared understanding through dialogue** and asks the Developer directly (`AskUserQuestion`) about business and architectural gaps. Unknown meaning stays unknown.
 3. **The gate order is mandatory:** contract approval → implementation → business review or Developer waiver → finding dispositions → provisional approval → tests → code review and acceptance. Early test *planning* is allowed; test writing/execution is not.
 4. **Freshness:** revisions are immutable; any production change invalidates review, provisional approval and test evidence. Technical repairs, test-only corrections and revisions each have a defined path.
-5. **Native tool restrictions where Claude Code offers them:** the Architect can delegate only to the five AGAD subagents and cannot edit or run shell commands; Scout and Decision Partner cannot edit or run shell commands; the Business Reviewer cannot edit; Implementer and Test Engineer cannot spawn subagents.
+5. **Native tool restrictions where Claude Code offers them:** the Architect can delegate only to the six AGAD subagents and cannot edit or run shell commands; Scout and Decision Partner cannot edit or run shell commands; the Business Reviewer cannot edit; Implementer and Test Engineer cannot spawn subagents.
 
 ### What this integration does and does not enforce
 Instructions and tool allowlists define and limit each role. This plugin ships **no hook or state machine**, so it does **not** enforce write paths (Implementer and Test Engineer keep `Edit`/`Write`/`Bash`), does not authenticate approvals, and cannot verify candidate freshness. Those obligations bind each role's instructions and the Architect's coordination, and rely on the Developer to refuse out-of-order work. For machine-checked transitions see the [Oh My Pi integration](../oh-my-pi/README.md) and the [reference validator](../../tools/validate.py).
@@ -24,6 +24,7 @@ Instructions and tool allowlists define and limit each role. This plugin ships *
 | **Architect** | `architect.md` | `claude-opus-5-5` | `medium` | `Read, Glob, Grep, WebSearch, AskUserQuestion, Agent(...)` | `Edit, Write, Bash` | Dialogue, contract, coordination, delegation briefs. |
 | **Implementer** | `implementer.md` | `claude-sonnet-5-5` | `medium` | `Read, Edit, Write, Bash, Glob, Grep` | `Agent` | Approved outcomes in approved production paths; local verification. |
 | **Business Reviewer** | `business-reviewer.md` | `claude-sonnet-5-5` | `high` | `Read, Glob, Grep, Bash` | `Edit, Write, Agent` | Scenario-first business review; not code review. Bash is for read-only observation only. |
+| **Documentation Steward** | `documentation-steward.md` | `claude-haiku-5-5` | `high` | `Read, Glob, Grep, Edit, Write` | `Bash, Agent` | Maintain authorized documentation as soon as implementation exists. |
 | **Test Engineer** | `test-engineer.md` | `claude-haiku-5-5` | `high` | `Read, Edit, Write, Bash, Glob, Grep` | `Agent` | Independent tests in approved test paths after the gate. |
 | **Scout** | `scout.md` | `claude-haiku-5-5` | `low` | `Read, Glob, Grep, WebSearch` | `Edit, Write, Bash, Agent` | Read-only evidence. |
 | **Decision Partner** | `decision-partner.md` | `claude-opus-5-5` | `high` | `Read, Glob, Grep` | `Edit, Write, Bash, Agent` | Advisory only. |
@@ -167,3 +168,6 @@ After review (or waiver) and the Developer's explicit provisional approval of th
 
 ### Step 6: Code Review & Acceptance
 The Developer conducts human code review of the actual diff and test results and may accept or request changes. Any production change after approval makes the candidate stale and repeats review, provisional approval and tests.
+
+### Documentation Steward
+The Architect can run the Documentation Steward as soon as implementation exists, alongside business review and without provisional approval. It may maintain authorized Markdown directly and correct Rustdoc comments only in coordinated source paths before candidate submission. Later Rustdoc corrections return through Implementer and require a fresh candidate. No extra gate.

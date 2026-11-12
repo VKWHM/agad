@@ -63,13 +63,13 @@ export default function agad(pi: ExtensionAPI) {
     await pi.setActiveTools(architectTools);
   }
   pi.on("session_before_switch", () =>
-    controller.busy ? { cancel: true } : undefined,
+    controller.busy || controller.activeDocumentation ? { cancel: true } : undefined,
   );
   pi.on("session_before_branch", () =>
-    controller.busy ? { cancel: true } : undefined,
+    controller.busy || controller.activeDocumentation ? { cancel: true } : undefined,
   );
   pi.on("session_before_tree", () =>
-    controller.busy ? { cancel: true } : undefined,
+    controller.busy || controller.activeDocumentation ? { cancel: true } : undefined,
   );
   pi.on("session_start", async (_event, ctx) => {
     await bind(ctx);
@@ -188,7 +188,7 @@ export default function agad(pi: ExtensionAPI) {
       scope_json: z
         .string()
         .describe(
-          "Scope JSON string: { production: string[], tests: string[], checks: Record<string, string[]> } where checks maps each check ID from required_checks to its exact command argv array, e.g. { \"test\": [\"bunx\", \"nx\", \"test\", \"@birbase/checkout\"] }",
+          "Scope JSON string: { production: string[], tests: string[], documentation?: string[] (Markdown-only, disjoint), rustdoc?: string[] (exact .rs paths inside production for pre-submission doc-comment pass), checks: Record<string, string[]> } where checks maps each check ID from required_checks to its exact command argv array, e.g. { \"test\": [\"bunx\", \"nx\", \"test\", \"@birbase/checkout\"] }",
         ),
     }),
     async execute(_id, args, signal, _update, ctx) {
@@ -322,7 +322,7 @@ export default function agad(pi: ExtensionAPI) {
     name: "agad_delegate",
     label: "Delegate governed task",
     description:
-      "Run scout, implementer, business_reviewer or test_engineer on the exact assigned model/effort. Core gates, candidate fingerprints and required checks are enforced. Phase gates: implementer needs 'authorized'; business_reviewer 'implemented'; test_engineer 'test_authorized'. Implementer, Business Reviewer and Test Engineer sessions stay alive across follow-up calls (registered as `agad-implementer`, `agad-business-reviewer`, `agad-test-engineer` on OMP IRC); pass `fresh: true` only when you want to discard the existing worker session and spawn a clean one.",
+      "Run scout, implementer, business_reviewer, test_engineer or documentation_steward on the exact assigned model/effort. The Steward maintains scoped Markdown from the implemented candidate without provisional approval; a scoped Rustdoc pass can run before the candidate is frozen. No new core state. Phase gates: implementer needs 'authorized'; business_reviewer 'implemented'; test_engineer 'test_authorized'. Implementer, Business Reviewer and Test Engineer sessions stay alive across follow-up calls (registered as `agad-implementer`, `agad-business-reviewer`, `agad-test-engineer` on OMP IRC); pass `fresh: true` only when you want to discard the existing worker session and spawn a clean one.",
     approval: "exec",
     parameters: z.object({
       role: z.enum([
@@ -330,6 +330,7 @@ export default function agad(pi: ExtensionAPI) {
         "implementer",
         "business_reviewer",
         "test_engineer",
+        "documentation_steward",
       ]),
       task: z
         .string()
@@ -340,20 +341,21 @@ export default function agad(pi: ExtensionAPI) {
         .describe("Set true only to discard the kept-alive worker session for this role and spawn a clean session."),
     }),
     async execute(_id, args, signal, _update, ctx) {
-      return exclusive(async () => {
-        const { role, task, fresh } = args as {
-          role: Role;
-          task: string;
-          fresh?: boolean;
-        };
+      const { role, task, fresh } = args as {
+        role: Role;
+        task: string;
+        fresh?: boolean;
+      };
+      const run = async () => {
         try {
-          return result(
-            await controller.delegate(ctx, role, task, signal, fresh === true),
-          );
+          return result(await controller.delegate(ctx, role, task, signal, fresh === true));
         } catch (error) {
           throw controller.explain(error, undefined, role);
         }
-      });
+      };
+      // Advisory documentation work can overlap the gated Test Engineer.
+      // It never commits a core transition or edits production/test paths.
+      return role === "documentation_steward" ? run() : exclusive(run);
     },
   });
   pi.registerTool({

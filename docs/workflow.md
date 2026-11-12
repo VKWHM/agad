@@ -47,3 +47,11 @@ Ask material policy questions directly in the active conversation. Record answer
 ## Human checkpoints
 
 Contract approval authorizes implementation; provisional approval authorizes test writing/execution; final acceptance follows actual checks and human code review. These remain separate decisions. The developer can reject a passing implementation. Unambiguous conversational approval is valid when attributed and durably referenced; no special approval UI is required.
+
+## Documentation preservation (advisory, no new gate)
+
+Documentation Steward work does **not** depend on business-review disposition, provisional approval, or the Test Engineer's gate. Once an implementation exists, it may reconcile missing, stale or duplicated documentation concurrently with business review; it may also maintain authorized documentation independently of a change. It follows the approved contract and established repository documentation permissions rather than asking for per-edit approval. No change needed is a valid outcome.
+
+Markdown changes in separate documentation paths do not change the production candidate. Rustdoc may be edited directly **before** the Implementer submits the immutable production candidate, only in coordinated authorized Rust source paths, without changing executable code. After submission, source/Rustdoc corrections return through the existing repair and fresh-candidate process. The OMP adapter may run a scoped Rustdoc pass automatically just before candidate submission; other integrations must coordinate that draft stage themselves.
+
+The Steward cannot decide business behavior, override an approved contract, or modify tests. The Architect presents material contradictions and the Steward's advisory findings during final review. This adds no approval state, workflow transition or test authorization. Preserve decision rationale and repository-specific knowledge-base write restrictions; link to authoritative facts instead of copying them.

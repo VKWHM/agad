@@ -17,7 +17,7 @@ class CodexAgentsConfigTests(unittest.TestCase):
     def test_agents_valid_toml_and_schema(self):
         files = glob.glob(os.path.join(self.agents_dir, "*.toml"))
         self.assertGreaterEqual(len(files), 5, "Should have defined at least 5 AGAD agents")
-        expected_roles = {"architect", "implementer", "business-reviewer", "test-engineer", "scout", "decision-partner"}
+        expected_roles = {"architect", "implementer", "business-reviewer", "test-engineer", "documentation-steward", "scout", "decision-partner"}
         found_roles = set()
 
         expected_models = {
@@ -25,6 +25,7 @@ class CodexAgentsConfigTests(unittest.TestCase):
             "implementer": ("gpt-6.1-sol", "medium"),
             "business-reviewer": ("gpt-6.1-sol", "medium"),
             "test-engineer": ("gpt-6.1-terra", "high"),
+            "documentation-steward": ("gpt-6-luna", "medium"),
             "scout": ("gpt-6-luna", "low"),
             "decision-partner": ("gpt-6.1-sol", "high"),
         }

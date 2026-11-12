@@ -5,7 +5,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 INT = ROOT / "integrations"
-ROLES = ("architect", "implementer", "business-reviewer", "test-engineer", "scout", "decision-partner")
+ROLES = ("architect", "implementer", "business-reviewer", "test-engineer", "documentation-steward", "scout", "decision-partner")
 
 def claude_agent(role):
     text = (INT / "claude-code/agents" / f"{role}.md").read_text()
@@ -40,6 +40,7 @@ class IntegrationGovernanceTests(unittest.TestCase):
             "implementer": ("exact", "unknown", "never claim a check", "contract", "candidate reference"),
             "business-reviewer": ("before", "violation", "new scenario", "ambiguity", "risk", "not a code reviewer", "never edit"),
             "test-engineer": ("provisional approval", "waived", "never edit production", "invariant", "fabricate", "fresh report"),
+            "documentation-steward": ("provisional approval", "documentation", "rustdoc", "approved", "report"),
             "scout": ("read-only", "never advances", "untrusted"),
             "decision-partner": ("advisory", "cannot", "not a decision"),
         }
@@ -77,7 +78,8 @@ class IntegrationGovernanceTests(unittest.TestCase):
 
     def test_codex_sandbox_modes(self):
         expected = {"architect": "read-only", "business-reviewer": "read-only", "scout": "read-only",
-                    "decision-partner": "read-only", "implementer": "workspace-write", "test-engineer": "workspace-write"}
+                    "decision-partner": "read-only", "implementer": "workspace-write", "test-engineer": "workspace-write",
+                    "documentation-steward": "workspace-write"}
         for role, mode in expected.items():
             with self.subTest(role=role):
                 self.assertEqual(codex_agent(role)[0]["sandbox_mode"], mode)
